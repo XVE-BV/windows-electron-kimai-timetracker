@@ -749,6 +749,9 @@ function setupIPC(): void {
 }
 
 async function initializeApp(): Promise<void> {
+  // Setup IPC handlers FIRST (before any windows load)
+  setupIPC();
+
   // Create tray
   const icon = createTrayIcon();
   tray = new Tray(icon);
@@ -788,9 +791,6 @@ async function initializeApp(): Promise<void> {
       startTimerUpdateLoop();
     }
   }
-
-  // Setup IPC handlers
-  setupIPC();
 
   // Create hidden main window (for renderer process)
   createMainWindow();
