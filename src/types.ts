@@ -167,19 +167,11 @@ export interface AppSettings {
 export interface TimerState {
   isRunning: boolean;
   currentTimesheetId: number | null;
-  startTime: string | null;
+  startTime: string | null;        // Kimai's rounded start time
+  actualStartTime: string | null;  // When user actually clicked Start
   projectId: number | null;
   activityId: number | null;
   description: string;
-}
-
-// Work Session State
-export type WorkSessionStatus = 'stopped' | 'active' | 'paused';
-
-export interface WorkSessionState {
-  status: WorkSessionStatus;
-  startedAt: string | null;
-  remindersEnabled: boolean;
 }
 
 // View Hashes for single-window navigation
@@ -225,12 +217,9 @@ export const IPC_CHANNELS = {
   // Timer
   GET_TIMER_STATE: 'get-timer-state',
 
-  // Work Session
-  WORK_SESSION_START: 'work-session-start',
-  WORK_SESSION_PAUSE: 'work-session-pause',
-  WORK_SESSION_STOP: 'work-session-stop',
-  WORK_SESSION_GET_STATE: 'work-session-get-state',
-  WORK_SESSION_TOGGLE_REMINDERS: 'work-session-toggle-reminders',
+  // Reminders
+  GET_REMINDERS_ENABLED: 'get-reminders-enabled',
+  TOGGLE_REMINDERS: 'toggle-reminders',
 
   // Window
   OPEN_SETTINGS: 'open-settings',

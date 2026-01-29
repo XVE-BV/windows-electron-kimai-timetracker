@@ -1,5 +1,7 @@
 import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell, net, screen } from 'electron';
 import * as path from 'path';
+import * as fs from 'fs';
+import { exec } from 'child_process';
 import { kimaiAPI } from './services/kimai';
 import { activityWatchAPI } from './services/activitywatch';
 import { jiraAPI } from './services/jira';
@@ -9,7 +11,7 @@ import {
   getTimerState,
   updateTimerState,
 } from './services/store';
-import { IPC_CHANNELS, VIEW_HASHES, AppSettings, KimaiProject, KimaiActivity, WorkSessionState } from './types';
+import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity } from './types';
 import {
   validateAppSettings,
   validateOptionalPositiveInt,
@@ -20,9 +22,9 @@ import {
   validateTimesheetCreate,
   sanitizeJql,
 } from './validation';
-import { ValidationError, getUserMessage } from './errors';
+import { getUserMessage } from './errors';
 import { formatDurationCompact } from './utils';
-import { TRAY_WINDOW_WIDTH, TRAY_WINDOW_HEIGHT, WORK_SESSION_REMINDER_INTERVAL_MS } from './constants';
+import { REMINDER_INTERVAL_MS } from './constants';
 import { initAutoUpdater } from './services/updater';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
@@ -65,19 +67,13 @@ let cachedActivities: KimaiActivity[] = [];
 // Timer update interval
 let timerUpdateInterval: NodeJS.Timeout | null = null;
 
-// Work session state
-let workSessionState: WorkSessionState = {
-  status: 'stopped',
-  startedAt: null,
-  remindersEnabled: true,
-};
+// Reminders state
+let remindersEnabled = true;
 
-// Work session reminder interval
-let workSessionReminderInterval: NodeJS.Timeout | null = null;
+// Reminder interval
+let reminderInterval: NodeJS.Timeout | null = null;
 
 function createTrayIcon(): Electron.NativeImage {
-  const fs = require('fs');
-
   // Try multiple paths for development and production
   const possiblePaths = [
     path.join(__dirname, 'assets', 'favicon.ico'),        // Webpack dev build
@@ -246,6 +242,9 @@ async function startTimer(): Promise<void> {
     return;
   }
 
+  // Capture actual start time before API call (Kimai will round it)
+  const actualStartTime = new Date().toISOString();
+
   try {
     const timesheet = await kimaiAPI.startTimer(
       timerState.projectId,
@@ -257,6 +256,7 @@ async function startTimer(): Promise<void> {
       isRunning: true,
       currentTimesheetId: timesheet.id,
       startTime: timesheet.begin,
+      actualStartTime: actualStartTime,
     });
 
     startTimerUpdateLoop();
@@ -280,6 +280,7 @@ async function stopTimer(): Promise<void> {
       isRunning: false,
       currentTimesheetId: null,
       startTime: null,
+      actualStartTime: null,
     });
 
     stopTimerUpdateLoop();
@@ -307,76 +308,41 @@ function stopTimerUpdateLoop(): void {
   }
 }
 
-// Work Session Functions
-function startWorkSession(): WorkSessionState {
-  workSessionState = {
-    ...workSessionState,
-    status: 'active',
-    startedAt: new Date().toISOString(),
-  };
-  startWorkSessionReminder();
-  return workSessionState;
+// Reminder Functions
+function startReminderInterval(): void {
+  stopReminderInterval(); // Clear any existing interval
+
+  // Check every interval
+  reminderInterval = setInterval(checkAndRemind, REMINDER_INTERVAL_MS);
 }
 
-function pauseWorkSession(): WorkSessionState {
-  workSessionState = {
-    ...workSessionState,
-    status: 'paused',
-  };
-  stopWorkSessionReminder();
-  return workSessionState;
-}
-
-function stopWorkSession(): WorkSessionState {
-  workSessionState = {
-    ...workSessionState,
-    status: 'stopped',
-    startedAt: null,
-  };
-  stopWorkSessionReminder();
-  return workSessionState;
-}
-
-function getWorkSessionState(): WorkSessionState {
-  return workSessionState;
-}
-
-function startWorkSessionReminder(): void {
-  stopWorkSessionReminder(); // Clear any existing interval
-
-  // Check immediately
-  checkAndRemind();
-
-  // Then check every minute
-  workSessionReminderInterval = setInterval(checkAndRemind, WORK_SESSION_REMINDER_INTERVAL_MS);
-}
-
-function stopWorkSessionReminder(): void {
-  if (workSessionReminderInterval) {
-    clearInterval(workSessionReminderInterval);
-    workSessionReminderInterval = null;
+function stopReminderInterval(): void {
+  if (reminderInterval) {
+    clearInterval(reminderInterval);
+    reminderInterval = null;
   }
 }
 
 function checkAndRemind(): void {
-  // Only remind if work session is active and reminders are enabled
-  if (workSessionState.status !== 'active' || !workSessionState.remindersEnabled) {
+  // Only remind if reminders are enabled
+  if (!remindersEnabled) {
     return;
   }
 
   // Check if Kimai timer is running
   const timerState = getTimerState();
   if (!timerState.isRunning) {
-    showNotification('Time Tracking Reminder', 'You are not tracking time! Start a timer or pause your work session.');
+    showNotification('Time Tracking', 'Don\'t forget to start your timer');
   }
 }
 
-function toggleWorkSessionReminders(): WorkSessionState {
-  workSessionState = {
-    ...workSessionState,
-    remindersEnabled: !workSessionState.remindersEnabled,
-  };
-  return workSessionState;
+function getRemindersEnabled(): boolean {
+  return remindersEnabled;
+}
+
+function toggleReminders(): boolean {
+  remindersEnabled = !remindersEnabled;
+  return remindersEnabled;
 }
 
 function showNotification(title: string, body: string): void {
@@ -600,11 +566,8 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.GET_TIMER_STATE, () => getTimerState());
 
   // Work Session
-  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_START, () => startWorkSession());
-  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_PAUSE, () => pauseWorkSession());
-  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_STOP, () => stopWorkSession());
-  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_GET_STATE, () => getWorkSessionState());
-  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_TOGGLE_REMINDERS, () => toggleWorkSessionReminders());
+  ipcMain.handle(IPC_CHANNELS.GET_REMINDERS_ENABLED, () => getRemindersEnabled());
+  ipcMain.handle(IPC_CHANNELS.TOGGLE_REMINDERS, () => toggleReminders());
 
   // Window
   ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, () => {
@@ -631,7 +594,6 @@ function setupIPC(): void {
 
   // Debug
   ipcMain.handle(IPC_CHANNELS.DEBUG_GET_PROCESSES, async () => {
-    const { exec } = require('child_process');
     const currentPid = process.pid;
 
     return new Promise((resolve) => {
@@ -688,7 +650,6 @@ function setupIPC(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.DEBUG_KILL_PROCESS, async (_, pid: number) => {
-    const { exec } = require('child_process');
     const currentPid = process.pid;
 
     if (pid === currentPid) {
@@ -818,6 +779,9 @@ async function initializeApp(): Promise<void> {
 
   // Initialize auto-updater (checks for updates automatically)
   initAutoUpdater();
+
+  // Start reminder interval (checks if not tracking time)
+  startReminderInterval();
 }
 
 // This method will be called when Electron has finished initialization

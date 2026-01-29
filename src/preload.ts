@@ -3,7 +3,6 @@ import {
   IPC_CHANNELS,
   AppSettings,
   KimaiTimesheetCreate,
-  WorkSessionState,
   KimaiCustomer,
   KimaiProject,
   KimaiActivity,
@@ -56,12 +55,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Timer State
   getTimerState: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TIMER_STATE),
 
-  // Work Session
-  workSessionStart: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_START),
-  workSessionPause: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_PAUSE),
-  workSessionStop: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_STOP),
-  workSessionGetState: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_GET_STATE),
-  workSessionToggleReminders: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_TOGGLE_REMINDERS),
+  // Reminders
+  getRemindersEnabled: () => ipcRenderer.invoke(IPC_CHANNELS.GET_REMINDERS_ENABLED),
+  toggleReminders: () => ipcRenderer.invoke(IPC_CHANNELS.TOGGLE_REMINDERS),
 
   // Window
   openSettings: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_SETTINGS),
@@ -110,11 +106,8 @@ export interface ElectronAPI {
   jiraSearchIssues: (jql: string, maxResults?: number) => Promise<JiraIssue[]>;
   jiraAddWorklog: (issueKey: string, timeSpentSeconds: number, started: string, comment?: string) => Promise<{ id: string }>;
   getTimerState: () => Promise<TimerState>;
-  workSessionStart: () => Promise<WorkSessionState>;
-  workSessionPause: () => Promise<WorkSessionState>;
-  workSessionStop: () => Promise<WorkSessionState>;
-  workSessionGetState: () => Promise<WorkSessionState>;
-  workSessionToggleReminders: () => Promise<WorkSessionState>;
+  getRemindersEnabled: () => Promise<boolean>;
+  toggleReminders: () => Promise<boolean>;
   openSettings: () => Promise<void>;
   openTimeEntry: () => Promise<void>;
   openChangelog: () => Promise<void>;

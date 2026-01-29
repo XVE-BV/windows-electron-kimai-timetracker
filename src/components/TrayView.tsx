@@ -1,20 +1,18 @@
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
-  Calendar, TrendingUp, Zap, CheckCircle2, XCircle, RefreshCw, Coffee,
-  Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket, Trash2,
-  Pause, Clock, AlertCircle, ScrollText, Bell, BellOff, Bug
+  Calendar, TrendingUp, Zap, RefreshCw, Monitor, Layers, Briefcase,
+  FileText, Search, X, Users, Ticket, Trash2, AlertCircle, ScrollText,
+  Bell, BellOff, Bug
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState, ActivitySummaryItem } from '../types';
-import { formatDuration as formatDurationUtil, formatDurationHuman } from '../utils';
+import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem } from '../types';
+import { formatDurationHuman } from '../utils';
 import { DATA_REFRESH_INTERVAL_MS, TIMER_UPDATE_INTERVAL_MS, MAX_RECENT_TIMESHEETS, MAX_ACTIVITY_SUMMARY_ITEMS, MAX_JIRA_ISSUES } from '../constants';
 
 export function TrayView() {
   const [timerState, setTimerState] = useState<TimerState | null>(null);
   const timerStateRef = useRef<TimerState | null>(null);
-  const [actualStartTime, setActualStartTime] = useState<Date | null>(null);
-  const actualStartTimeRef = useRef<Date | null>(null);
   const [elapsedTime, setElapsedTime] = useState('00:00:00');
   const [billedTime, setBilledTime] = useState('00:00:00');
   const [projects, setProjects] = useState<KimaiProject[]>([]);
@@ -46,8 +44,8 @@ export function TrayView() {
   const [jiraStatus, setJiraStatus] = useState<'connected' | 'disconnected' | 'disabled'>('disabled');
   const [jiraSearchQuery, setJiraSearchQuery] = useState('');
 
-  // Work session state
-  const [workSession, setWorkSession] = useState<WorkSessionState>({ status: 'stopped', startedAt: null, remindersEnabled: true });
+  // Reminders state
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
 
   // Error notification state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -97,9 +95,9 @@ export function TrayView() {
     if (!window.electronAPI) return;
     setIsRefreshing(true);
     try {
-      // Load work session state
-      const sessionState = await window.electronAPI.workSessionGetState();
-      setWorkSession(sessionState);
+      // Load reminders state
+      const reminders = await window.electronAPI.getRemindersEnabled();
+      setRemindersEnabled(reminders);
 
       // Load timer state
       const state = await window.electronAPI.getTimerState();
@@ -259,9 +257,8 @@ export function TrayView() {
   // Keep ref in sync with state for interval access
   useEffect(() => {
     timerStateRef.current = timerState;
-    actualStartTimeRef.current = actualStartTime;
     updateElapsedTime();
-  }, [timerState, actualStartTime]);
+  }, [timerState]);
 
   const formatSeconds = (totalSeconds: number): string => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -272,7 +269,6 @@ export function TrayView() {
 
   const updateElapsedTime = () => {
     const currentState = timerStateRef.current;
-    const actualStart = actualStartTimeRef.current;
 
     if (!currentState?.isRunning || !currentState.startTime) {
       setElapsedTime('00:00:00');
@@ -288,8 +284,8 @@ export function TrayView() {
     setBilledTime(formatSeconds(billedSeconds));
 
     // Actual time (from when user clicked Start, or fallback to billed)
-    const actualSeconds = actualStart
-      ? Math.floor((now.getTime() - actualStart.getTime()) / 1000)
+    const actualSeconds = currentState.actualStartTime
+      ? Math.floor((now.getTime() - new Date(currentState.actualStartTime).getTime()) / 1000)
       : billedSeconds;
     setElapsedTime(formatSeconds(actualSeconds));
   };
@@ -338,11 +334,7 @@ export function TrayView() {
           setSavedDescription('');
           setSelectedJiraIssue(null);
         }
-        // Clear actual start time when stopping
-        setActualStartTime(null);
       } else if (selectedProject && selectedActivity) {
-        // Store actual start time before API call (which will round it)
-        setActualStartTime(new Date());
         await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
         setSavedDescription(description);
       }
@@ -365,44 +357,11 @@ export function TrayView() {
     }
   };
 
-  const handleWorkSessionStart = async () => {
-    if (!window.electronAPI) return;
-    try {
-      const state = await window.electronAPI.workSessionStart();
-      setWorkSession(state);
-    } catch (error) {
-      console.error('Failed to start work session:', error);
-      showError('Failed to start work session');
-    }
-  };
-
-  const handleWorkSessionPause = async () => {
-    if (!window.electronAPI) return;
-    try {
-      const state = await window.electronAPI.workSessionPause();
-      setWorkSession(state);
-    } catch (error) {
-      console.error('Failed to pause work session:', error);
-      showError('Failed to pause work session');
-    }
-  };
-
-  const handleWorkSessionStop = async () => {
-    if (!window.electronAPI) return;
-    try {
-      const state = await window.electronAPI.workSessionStop();
-      setWorkSession(state);
-    } catch (error) {
-      console.error('Failed to stop work session:', error);
-      showError('Failed to stop work session');
-    }
-  };
-
   const handleToggleReminders = async () => {
     if (!window.electronAPI) return;
     try {
-      const state = await window.electronAPI.workSessionToggleReminders();
-      setWorkSession(state);
+      const enabled = await window.electronAPI.toggleReminders();
+      setRemindersEnabled(enabled);
     } catch (error) {
       console.error('Failed to toggle reminders:', error);
     }
@@ -578,12 +537,6 @@ export function TrayView() {
   const getProjectName = (projectId: number) => {
     const proj = allProjects.find(p => p.id === projectId);
     return proj?.name || 'Unknown';
-  };
-
-  const getActivityName = (activityId: number) => {
-    // Note: activities are loaded when a project is selected
-    // For timesheets, we might need to cache activities globally
-    return activities.find(a => a.id === activityId)?.name || '';
   };
 
   // Filtered lists based on search query
@@ -871,7 +824,7 @@ export function TrayView() {
 
   // Main view - comprehensive
   return (
-    <div className="w-full bg-background overflow-hidden">
+    <div className="w-full h-screen bg-background flex flex-col overflow-hidden">
       {/* Error Toast */}
       {errorMessage && (
         <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/30 flex items-center justify-between gap-2">
@@ -893,7 +846,7 @@ export function TrayView() {
       <div className="px-3 py-2 border-b border-border bg-muted/20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            {workSession.remindersEnabled && !timerState?.isRunning && (
+            {remindersEnabled && !timerState?.isRunning && (
               <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-600 rounded animate-pulse">
                 Not tracking!
               </span>
@@ -902,10 +855,10 @@ export function TrayView() {
           <div className="flex items-center gap-2">
             <button
               onClick={handleToggleReminders}
-              className={`p-1.5 rounded border ${workSession.remindersEnabled ? 'text-primary border-primary/50 bg-primary/10' : 'text-muted-foreground border-border hover:bg-muted'}`}
-              title={workSession.remindersEnabled ? 'Reminders on - click to disable' : 'Reminders off - click to enable'}
+              className={`p-1.5 rounded border ${remindersEnabled ? 'text-primary border-primary/50 bg-primary/10' : 'text-muted-foreground border-border hover:bg-muted'}`}
+              title={remindersEnabled ? 'Reminders on - click to disable' : 'Reminders off - click to enable'}
             >
-              {workSession.remindersEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
+              {remindersEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
             </button>
             <button
               onClick={loadData}
@@ -918,6 +871,9 @@ export function TrayView() {
             <div className="flex items-center gap-1.5 ml-1">
               <div title={`Kimai: ${connectionStatus}`} className={`h-2.5 w-2.5 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
               <div title={`ActivityWatch: ${awStatus}`} className={`h-2.5 w-2.5 rounded-full ${awStatus === 'connected' ? 'bg-blue-500' : awStatus === 'disabled' ? 'bg-gray-400' : 'bg-red-500'}`} />
+              {jiraEnabled && (
+                <div title={`Jira: ${jiraStatus}`} className={`h-2.5 w-2.5 rounded-full ${jiraStatus === 'connected' ? 'bg-purple-500' : jiraStatus === 'disabled' ? 'bg-gray-400' : 'bg-red-500'}`} />
+              )}
             </div>
           </div>
         </div>
@@ -929,7 +885,10 @@ export function TrayView() {
           {elapsedTime}
         </div>
         {timerState?.isRunning && elapsedTime !== billedTime && (
-          <div className="text-sm font-mono text-muted-foreground mt-1">
+          <div
+            className="text-sm font-mono text-muted-foreground mt-1 cursor-help"
+            title="Kimai rounds start time down to the nearest 15 minutes"
+          >
             Billed: {billedTime}
           </div>
         )}
@@ -987,8 +946,10 @@ export function TrayView() {
         </div>
       </div>
 
-      {/* Customer/Project/Activity Selection */}
-      <div className="p-2 border-t border-border space-y-1">
+      {/* Scrollable Content Area */}
+      <div className="flex-1 overflow-auto">
+        {/* Customer/Project/Activity Selection */}
+        <div className="p-2 border-t border-border space-y-1">
         <button
           onClick={() => setView('customers')}
           className="w-full px-3 py-2 text-left bg-muted/50 hover:bg-muted rounded-md flex items-center justify-between"
@@ -1197,6 +1158,7 @@ export function TrayView() {
           </div>
         </div>
       )}
+      </div>
 
       {/* Quick Actions */}
       <div className="p-2 border-t border-border flex gap-1">
@@ -1228,40 +1190,6 @@ export function TrayView() {
         >
           <Bug className="h-3 w-3" />
         </button>
-      </div>
-
-      {/* Connection Status Footer */}
-      <div className="px-3 py-1.5 bg-muted/20 border-t border-border flex items-center justify-between text-[10px] text-muted-foreground">
-        <div className="flex items-center gap-1">
-          {connectionStatus === 'connected' ? (
-            <CheckCircle2 className="h-3 w-3 text-green-500" />
-          ) : (
-            <XCircle className="h-3 w-3 text-red-500" />
-          )}
-          <span>Kimai</span>
-        </div>
-        <div className="flex items-center gap-1">
-          {awStatus === 'connected' ? (
-            <CheckCircle2 className="h-3 w-3 text-blue-500" />
-          ) : awStatus === 'disabled' ? (
-            <Coffee className="h-3 w-3 text-gray-400" />
-          ) : (
-            <XCircle className="h-3 w-3 text-red-500" />
-          )}
-          <span>AW</span>
-        </div>
-        {jiraEnabled && (
-          <div className="flex items-center gap-1">
-            {jiraStatus === 'connected' ? (
-              <CheckCircle2 className="h-3 w-3 text-blue-500" />
-            ) : jiraStatus === 'disabled' ? (
-              <Coffee className="h-3 w-3 text-gray-400" />
-            ) : (
-              <XCircle className="h-3 w-3 text-red-500" />
-            )}
-            <span>Jira</span>
-          </div>
-        )}
       </div>
     </div>
   );
