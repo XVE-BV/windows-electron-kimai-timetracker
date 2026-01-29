@@ -3,7 +3,7 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, RefreshCw, Monitor, Layers, Briefcase,
   FileText, Search, X, Users, Ticket, Trash2, AlertCircle, ScrollText,
-  Bell, BellOff, Bug
+  Bell, BellOff, Bug, PanelRightClose
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem } from '../types';
@@ -46,6 +46,10 @@ export function TrayView() {
 
   // Reminders state
   const [remindersEnabled, setRemindersEnabled] = useState(true);
+
+  // Panel states
+  const [recentEntriesOpen, setRecentEntriesOpen] = useState(false);
+  const [activityPanelOpen, setActivityPanelOpen] = useState(false);
 
   // Error notification state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -824,7 +828,7 @@ export function TrayView() {
 
   // Main view - comprehensive
   return (
-    <div className="w-full h-screen bg-background flex flex-col overflow-hidden">
+    <div className="w-full h-screen bg-background flex flex-col overflow-hidden relative">
       {/* Error Toast */}
       {errorMessage && (
         <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/30 flex items-center justify-between gap-2">
@@ -1097,71 +1101,120 @@ export function TrayView() {
         </Button>
       </div>
 
-      {/* Recent Entries */}
-      {todayTimesheets.length > 0 && (
-        <div className="border-t border-border">
-          <div className="px-3 py-2 bg-muted/30 flex items-center gap-2">
-            <FileText className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">Recent Entries</span>
-          </div>
-          <div className="max-h-28 overflow-y-auto">
-            {todayTimesheets.map((ts) => (
-              <div key={ts.id} className="px-3 py-2 border-b border-border/50 last:border-0 flex items-center justify-between group">
-                <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium truncate">{ts.description || getProjectName(ts.project)}</div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatTimesheetTime(ts.begin)}
-                    {ts.end && ` - ${formatTimesheetTime(ts.end)}`}
-                  </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="text-xs font-mono text-primary">
-                    {ts.duration ? formatDuration(ts.duration) : '--'}
-                  </div>
-                  <button
-                    onClick={() => handleDeleteTimesheet(ts.id)}
-                    className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-opacity"
-                    title="Delete entry"
-                    aria-label="Delete time entry"
-                  >
-                    <Trash2 className="h-3 w-3 text-red-500" />
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* ActivityWatch Summary */}
-      {activitySummary.length > 0 && (
-        <div className="border-t border-border">
-          <div className="px-3 py-2 bg-muted/30 flex items-center gap-2">
-            <Monitor className="h-3 w-3 text-muted-foreground" />
-            <span className="text-xs font-medium text-muted-foreground">Activity (Last Hour)</span>
-          </div>
-          <div className="px-3 py-2 space-y-2">
-            {activitySummary.map((item) => (
-              <div key={`${item.app}:${item.title}`} className="flex items-start justify-between gap-2">
-                <div className="flex items-start gap-2 min-w-0 flex-1">
-                  <Zap className="h-3 w-3 text-blue-500 flex-shrink-0 mt-0.5" />
-                  <div className="min-w-0 flex-1">
-                    <div className="text-xs font-medium truncate">{item.title || item.app}</div>
-                    <div className="text-[10px] text-muted-foreground truncate">{item.app}</div>
-                  </div>
-                </div>
-                <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
-                  {formatDuration(item.duration)}
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
       </div>
 
+      {/* Recent Entries Panel */}
+      {recentEntriesOpen && (
+        <div className="absolute inset-0 bg-background z-10 flex flex-col">
+          <div className="px-3 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <FileText className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Recent Entries</span>
+            </div>
+            <button
+              onClick={() => setRecentEntriesOpen(false)}
+              className="p-1 hover:bg-muted rounded"
+              title="Close"
+            >
+              <PanelRightClose className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {todayTimesheets.length > 0 ? (
+              todayTimesheets.map((ts) => (
+                <div key={ts.id} className="px-3 py-3 border-b border-border/50 last:border-0 flex items-center justify-between group">
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">{ts.description || getProjectName(ts.project)}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatTimesheetTime(ts.begin)}
+                      {ts.end && ` - ${formatTimesheetTime(ts.end)}`}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm font-mono text-primary">
+                      {ts.duration ? formatDuration(ts.duration) : '--'}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteTimesheet(ts.id)}
+                      className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-opacity"
+                      title="Delete entry"
+                    >
+                      <Trash2 className="h-4 w-4 text-red-500" />
+                    </button>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                No entries today
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ActivityWatch Panel */}
+      {activityPanelOpen && (
+        <div className="absolute inset-0 bg-background z-10 flex flex-col">
+          <div className="px-3 py-2 border-b border-border bg-muted/30 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Monitor className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Activity (Last Hour)</span>
+            </div>
+            <button
+              onClick={() => setActivityPanelOpen(false)}
+              className="p-1 hover:bg-muted rounded"
+              title="Close"
+            >
+              <PanelRightClose className="h-4 w-4 text-muted-foreground" />
+            </button>
+          </div>
+          <div className="flex-1 overflow-y-auto p-3 space-y-3">
+            {activitySummary.length > 0 ? (
+              activitySummary.map((item) => (
+                <div key={`${item.app}:${item.title}`} className="flex items-start justify-between gap-2">
+                  <div className="flex items-start gap-2 min-w-0 flex-1">
+                    <Zap className="h-4 w-4 text-blue-500 flex-shrink-0 mt-0.5" />
+                    <div className="min-w-0 flex-1">
+                      <div className="text-sm font-medium truncate">{item.title || item.app}</div>
+                      <div className="text-xs text-muted-foreground truncate">{item.app}</div>
+                    </div>
+                  </div>
+                  <span className="text-sm font-mono text-muted-foreground flex-shrink-0">
+                    {formatDuration(item.duration)}
+                  </span>
+                </div>
+              ))
+            ) : (
+              <div className="p-4 text-center text-muted-foreground text-sm">
+                No activity recorded
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Quick Actions */}
-      <div className="p-2 border-t border-border flex gap-1">
+      <div className="p-2 border-t border-border flex flex-col gap-1">
+        <div className="flex gap-1">
+          <button
+            onClick={() => setRecentEntriesOpen(true)}
+            className={`flex-1 px-2 py-2 text-xs rounded-md flex items-center justify-center gap-1 ${todayTimesheets.length > 0 ? 'text-muted-foreground hover:text-foreground hover:bg-muted' : 'text-muted-foreground/50 cursor-not-allowed'}`}
+            disabled={todayTimesheets.length === 0}
+          >
+            <FileText className="h-3 w-3" />
+            Recent Entries
+          </button>
+          <button
+            onClick={() => setActivityPanelOpen(true)}
+            className={`flex-1 px-2 py-2 text-xs rounded-md flex items-center justify-center gap-1 ${activitySummary.length > 0 ? 'text-muted-foreground hover:text-foreground hover:bg-muted' : 'text-muted-foreground/50 cursor-not-allowed'}`}
+            disabled={activitySummary.length === 0}
+          >
+            <Monitor className="h-3 w-3" />
+            Activity
+          </button>
+        </div>
+        <div className="flex gap-1">
         <button
           onClick={openTimeEntry}
           className="flex-1 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center justify-center gap-1"
@@ -1171,10 +1224,10 @@ export function TrayView() {
         </button>
         <button
           onClick={openSettings}
-          className="flex-1 px-3 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center justify-center gap-1"
+          className="px-2 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center justify-center"
+          title="Settings"
         >
           <Settings className="h-3 w-3" />
-          Settings
         </button>
         <button
           onClick={() => window.electronAPI?.openChangelog()}
@@ -1190,6 +1243,7 @@ export function TrayView() {
         >
           <Bug className="h-3 w-3" />
         </button>
+        </div>
       </div>
     </div>
   );
