@@ -892,6 +892,13 @@ export function TrayView() {
       <div className="px-3 py-2 border-b border-border bg-muted/20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <button
+              onClick={openSettings}
+              className="px-2.5 py-1.5 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-muted rounded-md border border-border flex items-center gap-1.5"
+            >
+              <Settings className="h-3.5 w-3.5" />
+              Settings
+            </button>
             {remindersEnabled && !timerState?.isRunning && (
               <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-600 rounded animate-pulse">
                 Not tracking!
@@ -1280,13 +1287,6 @@ export function TrayView() {
         >
           <Plus className="h-3 w-3" />
           Manual Entry
-        </button>
-        <button
-          onClick={openSettings}
-          className="px-2 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center justify-center"
-          title="Settings"
-        >
-          <Settings className="h-3 w-3" />
         </button>
         <button
           onClick={() => window.electronAPI?.openChangelog()}
