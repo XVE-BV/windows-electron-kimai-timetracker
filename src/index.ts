@@ -383,7 +383,7 @@ function createTrayWindow(): void {
     height: TRAY_WINDOW_HEIGHT,
     show: false,
     resizable: false,
-    minimizable: false,
+    minimizable: true,
     maximizable: false,
     title: 'Kimai Time Tracker',
     webPreferences: {
