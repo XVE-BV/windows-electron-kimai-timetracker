@@ -6,15 +6,9 @@ import {
   Pause, Clock, AlertCircle
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState } from '../types';
+import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState, ActivitySummaryItem } from '../types';
 import { formatDuration as formatDurationUtil, formatDurationHuman } from '../utils';
 import { DATA_REFRESH_INTERVAL_MS, TIMER_UPDATE_INTERVAL_MS, MAX_RECENT_TIMESHEETS, MAX_ACTIVITY_SUMMARY_ITEMS, MAX_JIRA_ISSUES } from '../constants';
-
-interface ActivitySummaryItem {
-  app: string;
-  title: string;
-  duration: number;
-}
 
 export function TrayView() {
   const [timerState, setTimerState] = useState<TimerState | null>(null);

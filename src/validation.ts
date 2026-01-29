@@ -112,6 +112,10 @@ export function validateAppSettings(value: unknown): AppSettings {
   if (typeof kimai.apiUrl !== 'string') {
     throw new ValidationError('Kimai API URL must be a string');
   }
+  // Validate URL format if not empty
+  if (kimai.apiUrl && typeof kimai.apiUrl === 'string' && kimai.apiUrl.trim()) {
+    validateUrl(kimai.apiUrl, 'Kimai API URL');
+  }
   if (typeof kimai.apiToken !== 'string') {
     throw new ValidationError('Kimai API token must be a string');
   }
@@ -124,6 +128,10 @@ export function validateAppSettings(value: unknown): AppSettings {
   if (typeof aw.apiUrl !== 'string') {
     throw new ValidationError('ActivityWatch API URL must be a string');
   }
+  // Validate URL format if not empty
+  if (aw.apiUrl && typeof aw.apiUrl === 'string' && aw.apiUrl.trim()) {
+    validateUrl(aw.apiUrl, 'ActivityWatch API URL');
+  }
   if (typeof aw.enabled !== 'boolean') {
     throw new ValidationError('ActivityWatch enabled must be a boolean');
   }
@@ -133,6 +141,10 @@ export function validateAppSettings(value: unknown): AppSettings {
     const jira = settings.jira as Record<string, unknown>;
     if (typeof jira.apiUrl !== 'string') {
       throw new ValidationError('Jira API URL must be a string');
+    }
+    // Validate URL format if not empty
+    if (jira.apiUrl && typeof jira.apiUrl === 'string' && jira.apiUrl.trim()) {
+      validateUrl(jira.apiUrl, 'Jira API URL');
     }
     if (typeof jira.email !== 'string') {
       throw new ValidationError('Jira email must be a string');

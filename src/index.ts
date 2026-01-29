@@ -444,18 +444,24 @@ function toggleTrayWindow(): void {
     createTrayWindow();
   }
 
-  if (trayWindow!.isVisible()) {
-    trayWindow!.hide();
+  // Guard against createTrayWindow failure
+  if (!trayWindow) {
+    console.error('Failed to create tray window');
+    return;
+  }
+
+  if (trayWindow.isVisible()) {
+    trayWindow.hide();
   } else {
     const position = calculateTrayWindowPosition();
-    trayWindow!.setBounds({
+    trayWindow.setBounds({
       x: position.x,
       y: position.y,
       width: TRAY_WINDOW_WIDTH,
       height: TRAY_WINDOW_HEIGHT,
     });
-    trayWindow!.show();
-    trayWindow!.focus();
+    trayWindow.show();
+    trayWindow.focus();
   }
 }
 

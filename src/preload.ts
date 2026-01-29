@@ -12,14 +12,8 @@ import {
   AWBuckets,
   AWEvent,
   JiraIssue,
+  ActivitySummaryItem,
 } from './types';
-
-// Activity summary type (returned by ActivityWatch service)
-interface ActivitySummaryItem {
-  app: string;
-  title: string;
-  duration: number;
-}
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object

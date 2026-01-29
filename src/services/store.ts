@@ -60,41 +60,35 @@ const store = new Store<StoreSchema>({
 
 /**
  * Encrypt a string using Electron's safeStorage
+ * Throws if encryption is not available to prevent plaintext credential storage
  */
 function encryptString(value: string): string {
   if (!value) return '';
-  if (safeStorage.isEncryptionAvailable()) {
-    const encrypted = safeStorage.encryptString(value);
-    return encrypted.toString('base64');
+  if (!safeStorage.isEncryptionAvailable()) {
+    throw new Error('Secure storage not available. Cannot save credentials safely.');
   }
-  // Fallback to plain storage if encryption not available
-  console.warn('safeStorage encryption not available, storing in plain text');
-  return value;
+  const encrypted = safeStorage.encryptString(value);
+  return encrypted.toString('base64');
 }
 
 /**
  * Decrypt a string using Electron's safeStorage
+ * Returns empty string if decryption fails for security
  */
 function decryptString(value: string): string {
   if (!value) return '';
-  if (safeStorage.isEncryptionAvailable()) {
-    try {
-      const buffer = Buffer.from(value, 'base64');
-      return safeStorage.decryptString(buffer);
-    } catch (error) {
-      // Check if it looks like a base64-encoded encrypted value that failed
-      const isLikelyEncrypted = /^[A-Za-z0-9+/=]+$/.test(value) && value.length > 50;
-      if (isLikelyEncrypted) {
-        // Likely corrupted encrypted data - return empty string instead of garbage
-        console.warn('Failed to decrypt encrypted token, returning empty string');
-        return '';
-      }
-      // Might be an old unencrypted value (plain text token), try using as-is
-      console.warn('Failed to decrypt, using value as-is (likely plain text)');
-      return value;
-    }
+  if (!safeStorage.isEncryptionAvailable()) {
+    console.warn('Secure storage not available, cannot decrypt credentials');
+    return '';
   }
-  return value;
+  try {
+    const buffer = Buffer.from(value, 'base64');
+    return safeStorage.decryptString(buffer);
+  } catch (error) {
+    // Decryption failed - return empty for security (don't leak potentially corrupted data)
+    console.warn('Failed to decrypt credential, returning empty string');
+    return '';
+  }
 }
 
 export function getSettings(): AppSettings {

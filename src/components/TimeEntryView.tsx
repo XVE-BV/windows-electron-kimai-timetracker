@@ -6,19 +6,14 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { AppSettings, KimaiProject, KimaiActivity } from '../types';
-
-interface ActivitySummary {
-  app: string;
-  title: string;
-  duration: number;
-}
+import { AppSettings, KimaiProject, KimaiActivity, ActivitySummaryItem } from '../types';
+import { formatDurationHuman } from '../utils';
 
 export function TimeEntryView() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [projects, setProjects] = useState<KimaiProject[]>([]);
   const [activities, setActivities] = useState<KimaiActivity[]>([]);
-  const [suggestions, setSuggestions] = useState<ActivitySummary[]>([]);
+  const [suggestions, setSuggestions] = useState<ActivitySummaryItem[]>([]);
   const [loadingSuggestions, setLoadingSuggestions] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -77,7 +72,7 @@ export function TimeEntryView() {
 
   const loadSuggestions = async () => {
     try {
-      const summary = await window.electronAPI.awGetActivitySummary(60) as ActivitySummary[];
+      const summary = await window.electronAPI.awGetActivitySummary(60) as ActivitySummaryItem[];
       setSuggestions(summary.slice(0, 8));
     } catch (error) {
       console.error('Failed to load suggestions:', error);
@@ -97,20 +92,21 @@ export function TimeEntryView() {
     }
   };
 
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) return `${hours}h ${minutes}m`;
-    return `${minutes}m`;
-  };
-
-  const handleSuggestionClick = (suggestion: ActivitySummary) => {
+  const handleSuggestionClick = (suggestion: ActivitySummaryItem) => {
     setDescription(`${suggestion.app}: ${suggestion.title}`);
   };
 
   const saveEntry = async () => {
     if (!selectedProject || !selectedActivity || !date || !startTime || !endTime) {
       alert('Please fill in all required fields');
+      return;
+    }
+
+    // Validate end time is after start time
+    const startDateTime = new Date(`${date}T${startTime}:00`);
+    const endDateTime = new Date(`${date}T${endTime}:00`);
+    if (endDateTime <= startDateTime) {
+      alert('End time must be after start time');
       return;
     }
 
@@ -264,7 +260,7 @@ export function TimeEntryView() {
                       <p className="text-xs text-muted-foreground truncate">{s.title}</p>
                     </div>
                     <span className="text-sm font-medium text-primary whitespace-nowrap">
-                      {formatDuration(s.duration)}
+                      {formatDurationHuman(s.duration)}
                     </span>
                   </button>
                 ))}

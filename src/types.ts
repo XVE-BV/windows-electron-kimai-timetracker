@@ -70,6 +70,13 @@ export interface AWBuckets {
   [key: string]: AWBucket;
 }
 
+// Activity summary returned by ActivityWatch service
+export interface ActivitySummaryItem {
+  app: string;
+  title: string;
+  duration: number;
+}
+
 // ActivityWatch Settings
 export interface AWSettings {
   apiUrl: string;
