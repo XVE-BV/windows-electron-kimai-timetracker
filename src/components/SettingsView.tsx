@@ -216,6 +216,7 @@ export function SettingsView() {
       defaultProjectId: defaultProject && defaultProject !== 'none' ? parseInt(defaultProject) : null,
       defaultActivityId: defaultActivity && defaultActivity !== 'none' ? parseInt(defaultActivity) : null,
       syncInterval: settings.syncInterval,
+      themeMode: settings.themeMode,
     };
 
     await window.electronAPI.saveSettings(newSettings);
