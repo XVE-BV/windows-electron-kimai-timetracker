@@ -9,7 +9,7 @@ import {
   getTimerState,
   updateTimerState,
 } from './services/store';
-import { IPC_CHANNELS, AppSettings, KimaiProject, KimaiActivity, WorkSessionState } from './types';
+import { IPC_CHANNELS, VIEW_HASHES, AppSettings, KimaiProject, KimaiActivity, WorkSessionState } from './types';
 import {
   validateAppSettings,
   validateOptionalPositiveInt,
@@ -196,7 +196,7 @@ async function buildContextMenu(): Promise<Menu> {
     // Manual Time Entry
     {
       label: 'Add Manual Entry...',
-      click: () => navigateTrayWindow('time-entry'),
+      click: () => navigateTrayWindow(VIEW_HASHES.TIME_ENTRY),
     },
 
     // ActivityWatch
@@ -209,7 +209,7 @@ async function buildContextMenu(): Promise<Menu> {
     // Settings
     {
       label: 'Settings...',
-      click: () => navigateTrayWindow('settings'),
+      click: () => navigateTrayWindow(VIEW_HASHES.SETTINGS),
     },
     { type: 'separator' },
 
@@ -430,7 +430,7 @@ function createTrayWindow(): void {
     },
   });
 
-  trayWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#tray`);
+  trayWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#${VIEW_HASHES.TRAY}`);
   trayWindow.setMenu(null);
 
   trayWindow.on('closed', () => {
@@ -601,16 +601,16 @@ function setupIPC(): void {
 
   // Window
   ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, () => {
-    navigateTrayWindow('settings');
+    navigateTrayWindow(VIEW_HASHES.SETTINGS);
   });
   ipcMain.handle(IPC_CHANNELS.OPEN_TIME_ENTRY, () => {
-    navigateTrayWindow('time-entry');
+    navigateTrayWindow(VIEW_HASHES.TIME_ENTRY);
   });
   ipcMain.handle(IPC_CHANNELS.OPEN_CHANGELOG, () => {
-    navigateTrayWindow('changelog');
+    navigateTrayWindow(VIEW_HASHES.CHANGELOG);
   });
   ipcMain.handle(IPC_CHANNELS.OPEN_TRAY, () => {
-    navigateTrayWindow('tray');
+    navigateTrayWindow(VIEW_HASHES.TRAY);
   });
   ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL, (_, url: string) => {
     if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
@@ -699,7 +699,7 @@ function setupIPC(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.OPEN_DEBUG, () => {
-    navigateTrayWindow('debug');
+    navigateTrayWindow(VIEW_HASHES.DEBUG);
   });
 
   // GitHub

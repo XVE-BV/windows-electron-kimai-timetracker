@@ -182,6 +182,17 @@ export interface WorkSessionState {
   remindersEnabled: boolean;
 }
 
+// View Hashes for single-window navigation
+export const VIEW_HASHES = {
+  TRAY: 'tray',
+  SETTINGS: 'settings',
+  TIME_ENTRY: 'time-entry',
+  CHANGELOG: 'changelog',
+  DEBUG: 'debug',
+} as const;
+
+export type ViewHash = typeof VIEW_HASHES[keyof typeof VIEW_HASHES];
+
 // IPC Channel Names
 export const IPC_CHANNELS = {
   // Settings
