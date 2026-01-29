@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, CheckCircle2, XCircle, RefreshCw, Coffee,
-  Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket
+  Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket, Trash2
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings } from '../types';
@@ -243,6 +243,16 @@ export function TrayView() {
       await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
     }
     loadData();
+  };
+
+  const handleDeleteTimesheet = async (id: number) => {
+    if (!window.electronAPI) return;
+    try {
+      await window.electronAPI.kimaiDeleteTimesheet(id);
+      loadData(); // Refresh the list
+    } catch (error) {
+      console.error('Failed to delete timesheet:', error);
+    }
   };
 
   const handleSelectCustomer = async (customer: KimaiCustomer) => {
@@ -879,7 +889,7 @@ export function TrayView() {
           </div>
           <div className="max-h-28 overflow-y-auto">
             {todayTimesheets.map((ts) => (
-              <div key={ts.id} className="px-3 py-2 border-b border-border/50 last:border-0 flex items-center justify-between">
+              <div key={ts.id} className="px-3 py-2 border-b border-border/50 last:border-0 flex items-center justify-between group">
                 <div className="flex-1 min-w-0">
                   <div className="text-xs font-medium truncate">{getProjectName(ts.project)}</div>
                   <div className="text-xs text-muted-foreground">
@@ -887,8 +897,17 @@ export function TrayView() {
                     {ts.end && ` - ${formatTimesheetTime(ts.end)}`}
                   </div>
                 </div>
-                <div className="text-xs font-mono text-primary ml-2">
-                  {ts.duration ? formatDuration(ts.duration) : '--'}
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-mono text-primary">
+                    {ts.duration ? formatDuration(ts.duration) : '--'}
+                  </div>
+                  <button
+                    onClick={() => handleDeleteTimesheet(ts.id)}
+                    className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-opacity"
+                    title="Delete entry"
+                  >
+                    <Trash2 className="h-3 w-3 text-red-500" />
+                  </button>
                 </div>
               </div>
             ))}

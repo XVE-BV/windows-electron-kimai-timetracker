@@ -498,6 +498,7 @@ function setupIPC(): void {
     return getTimerState();
   });
   ipcMain.handle(IPC_CHANNELS.KIMAI_CREATE_TIMESHEET, (_, data) => kimaiAPI.createTimesheet(data));
+  ipcMain.handle(IPC_CHANNELS.KIMAI_DELETE_TIMESHEET, (_, id: number) => kimaiAPI.deleteTimesheet(id));
 
   // ActivityWatch
   ipcMain.handle(IPC_CHANNELS.AW_GET_BUCKETS, () => activityWatchAPI.getBuckets());

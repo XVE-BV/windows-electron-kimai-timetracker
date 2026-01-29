@@ -170,6 +170,10 @@ class KimaiAPI {
     return this.request<KimaiTimesheet>('PATCH', `/timesheets/${id}`, data);
   }
 
+  async deleteTimesheet(id: number): Promise<void> {
+    await this.request<void>('DELETE', `/timesheets/${id}`);
+  }
+
   private formatDateTime(date: Date): string {
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
