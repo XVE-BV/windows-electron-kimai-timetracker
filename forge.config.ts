@@ -16,13 +16,14 @@ const config: ForgeConfig = {
     asar: true,
     name: 'Kimai Time Tracker',
     executableName: 'kimai-timetracker',
+    icon: './src/assets/favicon',
     extraResource: ['./src/assets'],
   },
   rebuildConfig: {},
   makers: [
     new MakerSquirrel({
       name: 'KimaiTimeTracker',
-      setupIcon: './src/assets/icon.ico',
+      setupIcon: './src/assets/favicon.ico',
     }),
     new MakerZIP({}, ['darwin']),
     new MakerRpm({}),
