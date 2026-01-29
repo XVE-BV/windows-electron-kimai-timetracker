@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } from 'electron';
 import * as path from 'path';
 import { kimaiAPI } from './services/kimai';
 import { activityWatchAPI } from './services/activitywatch';
@@ -399,38 +399,6 @@ function createTrayWindow(): void {
   trayWindow.setMenu(null);
 }
 
-function calculateTrayWindowPosition(): { x: number; y: number } {
-  if (!tray) return { x: 0, y: 0 };
-
-  const trayBounds = tray.getBounds();
-  const screenBounds = screen.getPrimaryDisplay().workArea;
-
-  // Determine tray position (which corner of screen)
-  const isTop = trayBounds.y < screenBounds.height / 2;
-  const isLeft = trayBounds.x < screenBounds.width / 2;
-
-  let x: number;
-  let y: number;
-
-  if (isLeft) {
-    x = Math.floor(trayBounds.x + trayBounds.width / 2);
-  } else {
-    x = Math.floor(trayBounds.x - TRAY_WINDOW_WIDTH + trayBounds.width / 2);
-  }
-
-  if (isTop) {
-    y = Math.floor(trayBounds.y + trayBounds.height);
-  } else {
-    y = Math.floor(trayBounds.y - TRAY_WINDOW_HEIGHT);
-  }
-
-  // Ensure window stays within screen bounds
-  x = Math.max(screenBounds.x, Math.min(x, screenBounds.x + screenBounds.width - TRAY_WINDOW_WIDTH));
-  y = Math.max(screenBounds.y, Math.min(y, screenBounds.y + screenBounds.height - TRAY_WINDOW_HEIGHT));
-
-  return { x, y };
-}
-
 function toggleTrayWindow(): void {
   if (!trayWindow) {
     createTrayWindow();
@@ -445,13 +413,7 @@ function toggleTrayWindow(): void {
   if (trayWindow.isVisible()) {
     trayWindow.hide();
   } else {
-    const position = calculateTrayWindowPosition();
-    trayWindow.setBounds({
-      x: position.x,
-      y: position.y,
-      width: TRAY_WINDOW_WIDTH,
-      height: TRAY_WINDOW_HEIGHT,
-    });
+    trayWindow.center();
     trayWindow.show();
     trayWindow.focus();
   }
