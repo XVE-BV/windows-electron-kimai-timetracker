@@ -558,6 +558,7 @@ function setupIPC(): void {
       // Invalidate cached data since API credentials may have changed
       cachedProjects = [];
       cachedActivities = [];
+      activityWatchAPI.clearCache();
       await updateTrayMenu();
       // Notify tray window to refresh
       if (trayWindow && !trayWindow.isDestroyed()) {

@@ -286,6 +286,7 @@ export function TrayView() {
         await window.electronAPI.kimaiStopTimer();
 
         // Log to Jira if a ticket was linked
+        let jiraSuccess = true;
         if (jiraIssueToLog && timerStartTime && jiraEnabled) {
           try {
             const startDate = new Date(timerStartTime);
@@ -306,11 +307,15 @@ export function TrayView() {
           } catch (error) {
             console.error('Failed to log to Jira:', error);
             showError(`Failed to log time to Jira ${jiraIssueToLog.key}. Time was logged to Kimai only.`);
+            jiraSuccess = false;
           }
         }
 
-        setDescription(''); // Clear description after stopping
-        setSelectedJiraIssue(null); // Clear Jira issue after stopping
+        // Only clear description/Jira issue if Jira logged successfully (or wasn't needed)
+        if (jiraSuccess) {
+          setDescription('');
+          setSelectedJiraIssue(null);
+        }
       } else if (selectedProject && selectedActivity) {
         await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
       }
