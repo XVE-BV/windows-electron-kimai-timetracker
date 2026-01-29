@@ -1,0 +1,39 @@
+import React, { useEffect, useState } from 'react';
+import { SettingsView } from './SettingsView';
+import { TimeEntryView } from './TimeEntryView';
+import { MainView } from './MainView';
+import { TrayView } from './TrayView';
+
+type View = 'main' | 'settings' | 'time-entry' | 'tray';
+
+export function App() {
+  const [view, setView] = useState<View>('main');
+
+  useEffect(() => {
+    const handleHashChange = () => {
+      const hash = window.location.hash;
+      if (hash === '#settings') {
+        setView('settings');
+      } else if (hash === '#time-entry') {
+        setView('time-entry');
+      } else if (hash === '#tray') {
+        setView('tray');
+      } else {
+        setView('main');
+      }
+    };
+
+    handleHashChange();
+    window.addEventListener('hashchange', handleHashChange);
+    return () => window.removeEventListener('hashchange', handleHashChange);
+  }, []);
+
+  return (
+    <div className={`${view === 'tray' ? '' : 'min-h-screen'} bg-background animate-fade-in`}>
+      {view === 'settings' && <SettingsView />}
+      {view === 'time-entry' && <TimeEntryView />}
+      {view === 'tray' && <TrayView />}
+      {view === 'main' && <MainView />}
+    </div>
+  );
+}

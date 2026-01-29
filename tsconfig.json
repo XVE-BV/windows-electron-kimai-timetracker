@@ -13,7 +13,9 @@
     "resolveJsonModule": true,
     "strict": false,
     "lib": ["ES2020", "DOM"],
+    "jsx": "react-jsx",
     "paths": {
+      "@/*": ["src/*"],
       "*": ["node_modules/*"]
     }
   },

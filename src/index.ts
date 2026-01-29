@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, screen } from 'electron';
 import * as path from 'path';
 import { kimaiAPI } from './services/kimai';
 import { activityWatchAPI } from './services/activitywatch';
@@ -20,6 +20,7 @@ if (require('electron-squirrel-startup')) {
 
 let tray: Tray | null = null;
 let mainWindow: BrowserWindow | null = null;
+let trayWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let timeEntryWindow: BrowserWindow | null = null;
 
@@ -29,6 +30,10 @@ let cachedActivities: KimaiActivity[] = [];
 
 // Timer update interval
 let timerUpdateInterval: NodeJS.Timeout | null = null;
+
+// Tray window dimensions
+const TRAY_WINDOW_WIDTH = 380;
+const TRAY_WINDOW_HEIGHT = 600;
 
 function createTrayIcon(): Electron.NativeImage {
   // Create a simple tray icon (16x16 for Windows)
@@ -290,6 +295,88 @@ function createMainWindow(): void {
   });
 }
 
+function createTrayWindow(): void {
+  trayWindow = new BrowserWindow({
+    width: TRAY_WINDOW_WIDTH,
+    height: TRAY_WINDOW_HEIGHT,
+    show: false,
+    frame: false,
+    fullscreenable: false,
+    resizable: false,
+    transparent: true,
+    alwaysOnTop: true,
+    skipTaskbar: true,
+    webPreferences: {
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      contextIsolation: true,
+      nodeIntegration: false,
+      backgroundThrottling: false,
+    },
+  });
+
+  trayWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#tray`);
+  trayWindow.setMenu(null);
+
+  // Hide when focus is lost
+  trayWindow.on('blur', () => {
+    if (trayWindow && !trayWindow.webContents.isDevToolsOpened()) {
+      trayWindow.hide();
+    }
+  });
+}
+
+function calculateTrayWindowPosition(): { x: number; y: number } {
+  if (!tray) return { x: 0, y: 0 };
+
+  const trayBounds = tray.getBounds();
+  const screenBounds = screen.getPrimaryDisplay().workArea;
+
+  // Determine tray position (which corner of screen)
+  const isTop = trayBounds.y < screenBounds.height / 2;
+  const isLeft = trayBounds.x < screenBounds.width / 2;
+
+  let x: number;
+  let y: number;
+
+  if (isLeft) {
+    x = Math.floor(trayBounds.x + trayBounds.width / 2);
+  } else {
+    x = Math.floor(trayBounds.x - TRAY_WINDOW_WIDTH + trayBounds.width / 2);
+  }
+
+  if (isTop) {
+    y = Math.floor(trayBounds.y + trayBounds.height);
+  } else {
+    y = Math.floor(trayBounds.y - TRAY_WINDOW_HEIGHT);
+  }
+
+  // Ensure window stays within screen bounds
+  x = Math.max(screenBounds.x, Math.min(x, screenBounds.x + screenBounds.width - TRAY_WINDOW_WIDTH));
+  y = Math.max(screenBounds.y, Math.min(y, screenBounds.y + screenBounds.height - TRAY_WINDOW_HEIGHT));
+
+  return { x, y };
+}
+
+function toggleTrayWindow(): void {
+  if (!trayWindow) {
+    createTrayWindow();
+  }
+
+  if (trayWindow!.isVisible()) {
+    trayWindow!.hide();
+  } else {
+    const position = calculateTrayWindowPosition();
+    trayWindow!.setBounds({
+      x: position.x,
+      y: position.y,
+      width: TRAY_WINDOW_WIDTH,
+      height: TRAY_WINDOW_HEIGHT,
+    });
+    trayWindow!.show();
+    trayWindow!.focus();
+  }
+}
+
 function openSettingsWindow(): void {
   if (settingsWindow && !settingsWindow.isDestroyed()) {
     settingsWindow.focus();
@@ -412,8 +499,14 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.GET_TIMER_STATE, () => getTimerState());
 
   // Window
-  ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, openSettingsWindow);
-  ipcMain.handle(IPC_CHANNELS.OPEN_TIME_ENTRY, openTimeEntryWindow);
+  ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, () => {
+    if (trayWindow) trayWindow.hide();
+    openSettingsWindow();
+  });
+  ipcMain.handle(IPC_CHANNELS.OPEN_TIME_ENTRY, () => {
+    if (trayWindow) trayWindow.hide();
+    openTimeEntryWindow();
+  });
   ipcMain.handle(IPC_CHANNELS.CLOSE_WINDOW, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.close();
@@ -426,13 +519,16 @@ async function initializeApp(): Promise<void> {
   tray = new Tray(icon);
   tray.setToolTip('Kimai Time Tracker');
 
-  // Build initial menu
-  const menu = await buildContextMenu();
-  tray.setContextMenu(menu);
+  // Create tray popup window
+  createTrayWindow();
 
-  // Handle tray click (Windows)
+  // Handle tray clicks - both left and right show custom popup
   tray.on('click', () => {
-    updateTrayMenu();
+    toggleTrayWindow();
+  });
+
+  tray.on('right-click', () => {
+    toggleTrayWindow();
   });
 
   // Check if timer was running (recover state)

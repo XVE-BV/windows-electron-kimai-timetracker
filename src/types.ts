@@ -81,6 +81,7 @@ export interface AppSettings {
   kimai: KimaiSettings;
   activityWatch: AWSettings;
   autoStartTimer: boolean;
+  defaultCustomerId: number | null;
   defaultProjectId: number | null;
   defaultActivityId: number | null;
   syncInterval: number; // minutes
@@ -137,6 +138,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabled: true,
   },
   autoStartTimer: false,
+  defaultCustomerId: null,
   defaultProjectId: null,
   defaultActivityId: null,
   syncInterval: 15,
