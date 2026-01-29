@@ -776,9 +776,11 @@ async function initializeApp(): Promise<void> {
     toggleTrayWindow();
   });
 
-  // Right-click shows quit menu
+  // Right-click shows context menu
   tray.on('right-click', () => {
     const contextMenu = Menu.buildFromTemplate([
+      { label: 'Settings', click: () => navigateTrayWindow(VIEW_HASHES.SETTINGS) },
+      { type: 'separator' },
       { label: 'Quit', click: () => app.quit() }
     ]);
     tray.popUpContextMenu(contextMenu);
