@@ -12,11 +12,14 @@ jobs:
       matrix:
         include:
           - os: windows-latest
-            platform: win32
+            platform: Windows
+            extension: exe
           - os: macos-latest
-            platform: darwin
+            platform: macOS
+            extension: dmg
           - os: ubuntu-latest
-            platform: linux
+            platform: Linux
+            extension: deb
 
     runs-on: ${{ matrix.os }}
 
@@ -36,17 +39,41 @@ jobs:
       - name: Build and Make
         run: npm run make
 
+      - name: Get version
+        id: version
+        shell: bash
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Rename artifacts (Windows)
+        if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          $version = "${{ steps.version.outputs.version }}"
+          Get-ChildItem -Path out/make -Recurse -Filter "*.exe" | ForEach-Object {
+            $newName = "KimaiTimeTracker-$version-Windows-Setup.exe"
+            Copy-Item $_.FullName -Destination "out/make/$newName"
+          }
+
+      - name: Rename artifacts (macOS)
+        if: matrix.os == 'macos-latest'
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          find out/make -name "*.dmg" -exec cp {} "out/make/KimaiTimeTracker-$version-macOS.dmg" \;
+          find out/make -name "*.zip" -exec cp {} "out/make/KimaiTimeTracker-$version-macOS.zip" \;
+
+      - name: Rename artifacts (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          version="${{ steps.version.outputs.version }}"
+          find out/make -name "*.deb" -exec cp {} "out/make/KimaiTimeTracker-$version-Linux-amd64.deb" \;
+          find out/make -name "*.rpm" -exec cp {} "out/make/KimaiTimeTracker-$version-Linux-x86_64.rpm" \;
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.platform }}-build
           path: |
-            out/make/**/*.exe
-            out/make/**/*.msi
-            out/make/**/*.dmg
-            out/make/**/*.zip
-            out/make/**/*.deb
-            out/make/**/*.rpm
+            out/make/KimaiTimeTracker-*
           if-no-files-found: ignore
 
   release:
@@ -62,6 +89,9 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           path: artifacts
+
+      - name: List artifacts
+        run: find artifacts -type f
 
       - name: Create Release
         uses: softprops/action-gh-release@v1

@@ -25,20 +25,25 @@ const config: ForgeConfig = {
     new MakerSquirrel({
       name: 'KimaiTimeTracker',
       setupIcon: './src/assets/favicon.ico',
+      setupExe: 'KimaiTimeTracker-Windows-Setup.exe',
     }),
     new MakerDMG({
-      name: 'KimaiTimeTracker',
+      name: 'KimaiTimeTracker-macOS',
     }),
     new MakerZIP({}, ['darwin']),
     new MakerDeb({
       options: {
-        maintainer: 'Kimai Time Tracker',
-        homepage: 'https://github.com/your-repo/kimai-timetracker',
+        name: 'kimai-timetracker',
+        productName: 'Kimai Time Tracker',
+        maintainer: 'XVE BV',
+        homepage: 'https://github.com/XVE-BV/windows-electron-kimai-timetracker',
       },
     }),
     new MakerRpm({
       options: {
-        homepage: 'https://github.com/your-repo/kimai-timetracker',
+        name: 'kimai-timetracker',
+        productName: 'Kimai Time Tracker',
+        homepage: 'https://github.com/XVE-BV/windows-electron-kimai-timetracker',
       },
     }),
   ],
