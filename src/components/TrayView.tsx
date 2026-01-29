@@ -13,7 +13,10 @@ import { DATA_REFRESH_INTERVAL_MS, TIMER_UPDATE_INTERVAL_MS, MAX_RECENT_TIMESHEE
 export function TrayView() {
   const [timerState, setTimerState] = useState<TimerState | null>(null);
   const timerStateRef = useRef<TimerState | null>(null);
+  const [actualStartTime, setActualStartTime] = useState<Date | null>(null);
+  const actualStartTimeRef = useRef<Date | null>(null);
   const [elapsedTime, setElapsedTime] = useState('00:00:00');
+  const [billedTime, setBilledTime] = useState('00:00:00');
   const [projects, setProjects] = useState<KimaiProject[]>([]);
   const [allProjects, setAllProjects] = useState<KimaiProject[]>([]);
   const [activities, setActivities] = useState<KimaiActivity[]>([]);
@@ -256,27 +259,39 @@ export function TrayView() {
   // Keep ref in sync with state for interval access
   useEffect(() => {
     timerStateRef.current = timerState;
+    actualStartTimeRef.current = actualStartTime;
     updateElapsedTime();
-  }, [timerState]);
+  }, [timerState, actualStartTime]);
+
+  const formatSeconds = (totalSeconds: number): string => {
+    const hours = Math.floor(totalSeconds / 3600);
+    const minutes = Math.floor((totalSeconds % 3600) / 60);
+    const secs = totalSeconds % 60;
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+  };
 
   const updateElapsedTime = () => {
     const currentState = timerStateRef.current;
+    const actualStart = actualStartTimeRef.current;
+
     if (!currentState?.isRunning || !currentState.startTime) {
       setElapsedTime('00:00:00');
+      setBilledTime('00:00:00');
       return;
     }
 
-    const start = new Date(currentState.startTime);
     const now = new Date();
-    const seconds = Math.floor((now.getTime() - start.getTime()) / 1000);
 
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = seconds % 60;
+    // Billed time (from Kimai's rounded start time)
+    const billedStart = new Date(currentState.startTime);
+    const billedSeconds = Math.floor((now.getTime() - billedStart.getTime()) / 1000);
+    setBilledTime(formatSeconds(billedSeconds));
 
-    setElapsedTime(
-      `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
-    );
+    // Actual time (from when user clicked Start, or fallback to billed)
+    const actualSeconds = actualStart
+      ? Math.floor((now.getTime() - actualStart.getTime()) / 1000)
+      : billedSeconds;
+    setElapsedTime(formatSeconds(actualSeconds));
   };
 
   const handleStartStop = async () => {
@@ -323,7 +338,11 @@ export function TrayView() {
           setSavedDescription('');
           setSelectedJiraIssue(null);
         }
+        // Clear actual start time when stopping
+        setActualStartTime(null);
       } else if (selectedProject && selectedActivity) {
+        // Store actual start time before API call (which will round it)
+        setActualStartTime(new Date());
         await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
         setSavedDescription(description);
       }
@@ -909,6 +928,11 @@ export function TrayView() {
         <div className={`text-4xl font-mono font-bold tracking-wider ${timerState?.isRunning ? 'text-primary' : 'text-muted-foreground'}`}>
           {elapsedTime}
         </div>
+        {timerState?.isRunning && elapsedTime !== billedTime && (
+          <div className="text-sm font-mono text-muted-foreground mt-1">
+            Billed: {billedTime}
+          </div>
+        )}
         <div className="flex items-center justify-center gap-1 mt-2">
           <div className={`h-2 w-2 rounded-full ${timerState?.isRunning ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30'}`} />
           <p className="text-xs text-muted-foreground">
