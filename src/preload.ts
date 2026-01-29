@@ -36,6 +36,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke(IPC_CHANNELS.KIMAI_CREATE_TIMESHEET, data),
   kimaiDeleteTimesheet: (id: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.KIMAI_DELETE_TIMESHEET, id),
+  kimaiUpdateDescription: (id: number, description: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.KIMAI_UPDATE_DESCRIPTION, id, description),
 
   // ActivityWatch
   awGetBuckets: () => ipcRenderer.invoke(IPC_CHANNELS.AW_GET_BUCKETS),
@@ -99,6 +101,7 @@ export interface ElectronAPI {
   kimaiStopTimer: () => Promise<TimerState>;
   kimaiCreateTimesheet: (data: KimaiTimesheetCreate) => Promise<KimaiTimesheet>;
   kimaiDeleteTimesheet: (id: number) => Promise<void>;
+  kimaiUpdateDescription: (id: number, description: string) => Promise<KimaiTimesheet>;
   awGetBuckets: () => Promise<AWBuckets>;
   awGetEvents: (bucketId: string, start?: string, end?: string, limit?: number) => Promise<AWEvent[]>;
   awGetActivitySummary: (minutes?: number) => Promise<ActivitySummaryItem[]>;

@@ -555,6 +555,14 @@ function setupIPC(): void {
     const validated = validateStrictPositiveInt(id, 'id');
     return kimaiAPI.deleteTimesheet(validated);
   });
+  ipcMain.handle(IPC_CHANNELS.KIMAI_UPDATE_DESCRIPTION, async (_, id: unknown, description: unknown) => {
+    const validId = validateStrictPositiveInt(id, 'id');
+    const validDescription = validateOptionalString(description, 'description') || '';
+    const result = await kimaiAPI.updateTimesheet(validId, { description: validDescription });
+    // Update local timer state description
+    updateTimerState({ description: validDescription });
+    return result;
+  });
 
   // ActivityWatch
   ipcMain.handle(IPC_CHANNELS.AW_GET_BUCKETS, () => activityWatchAPI.getBuckets());

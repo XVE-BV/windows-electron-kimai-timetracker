@@ -209,6 +209,7 @@ export const IPC_CHANNELS = {
   KIMAI_STOP_TIMER: 'kimai-stop-timer',
   KIMAI_CREATE_TIMESHEET: 'kimai-create-timesheet',
   KIMAI_DELETE_TIMESHEET: 'kimai-delete-timesheet',
+  KIMAI_UPDATE_DESCRIPTION: 'kimai-update-description',
 
   // ActivityWatch
   AW_GET_BUCKETS: 'aw-get-buckets',

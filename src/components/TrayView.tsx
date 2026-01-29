@@ -32,6 +32,8 @@ export function TrayView() {
   const [isTimerLoading, setIsTimerLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [description, setDescription] = useState('');
+  const [savedDescription, setSavedDescription] = useState('');
+  const [isUpdatingDescription, setIsUpdatingDescription] = useState(false);
 
   // Jira state
   const [jiraEnabled, setJiraEnabled] = useState(false);
@@ -103,6 +105,7 @@ export function TrayView() {
       // Load description from running timer
       if (state.isRunning && state.description) {
         setDescription(state.description);
+        setSavedDescription(state.description);
       }
 
       // Load customers
@@ -317,10 +320,12 @@ export function TrayView() {
         // Only clear description/Jira issue if Jira logged successfully (or wasn't needed)
         if (jiraSuccess) {
           setDescription('');
+          setSavedDescription('');
           setSelectedJiraIssue(null);
         }
       } else if (selectedProject && selectedActivity) {
         await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
+        setSavedDescription(description);
       }
       await loadData();
     } catch (error) {
@@ -381,6 +386,20 @@ export function TrayView() {
       setWorkSession(state);
     } catch (error) {
       console.error('Failed to toggle reminders:', error);
+    }
+  };
+
+  const handleUpdateDescription = async () => {
+    if (!window.electronAPI || !timerState?.currentTimesheetId) return;
+    setIsUpdatingDescription(true);
+    try {
+      await window.electronAPI.kimaiUpdateDescription(timerState.currentTimesheetId, description);
+      setSavedDescription(description);
+    } catch (error) {
+      console.error('Failed to update description:', error);
+      showError('Failed to update description');
+    } finally {
+      setIsUpdatingDescription(false);
     }
   };
 
@@ -1030,10 +1049,28 @@ export function TrayView() {
             placeholder="What are you working on?"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
-            disabled={timerState?.isRunning}
             rows={2}
-            className="w-full px-3 py-2 text-sm bg-background border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-muted-foreground/60 resize-none"
+            className="w-full px-3 py-2 text-sm bg-background border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary placeholder:text-muted-foreground/60 resize-none"
           />
+          {/* Update button when description is dirty while timer is running */}
+          {timerState?.isRunning && description !== savedDescription && (
+            <Button
+              onClick={handleUpdateDescription}
+              disabled={isUpdatingDescription}
+              variant="secondary"
+              size="sm"
+              className="mt-1 w-full"
+            >
+              {isUpdatingDescription ? (
+                <>
+                  <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                'Update Description'
+              )}
+            </Button>
+          )}
         </div>
       </div>
 
