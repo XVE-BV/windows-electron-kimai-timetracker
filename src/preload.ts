@@ -65,6 +65,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openSettings: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_SETTINGS),
   openTimeEntry: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_TIME_ENTRY),
   openChangelog: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_CHANGELOG),
+  openTray: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_TRAY),
   openExternal: (url: string) => ipcRenderer.invoke(IPC_CHANNELS.OPEN_EXTERNAL, url),
   closeWindow: () => ipcRenderer.invoke(IPC_CHANNELS.CLOSE_WINDOW),
 
@@ -114,6 +115,7 @@ export interface ElectronAPI {
   openSettings: () => Promise<void>;
   openTimeEntry: () => Promise<void>;
   openChangelog: () => Promise<void>;
+  openTray: () => Promise<void>;
   openExternal: (url: string) => Promise<void>;
   closeWindow: () => Promise<void>;
   githubGetReleases: () => Promise<Array<{

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ScrollText, X, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
+import { ScrollText, Loader2, ExternalLink, AlertCircle, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import ReactMarkdown from 'react-markdown';
 
@@ -44,11 +44,22 @@ export function ChangelogView() {
     });
   };
 
+  const goBack = () => {
+    window.electronAPI?.openTray();
+  };
+
   return (
     <div className="w-full bg-background overflow-hidden h-screen flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5 flex items-center justify-between">
+      <div className="p-3 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">
         <div className="flex items-center gap-3">
+          <button
+            onClick={goBack}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </button>
           <div className="p-2 bg-primary/20 rounded-lg">
             <ScrollText className="h-5 w-5 text-primary" />
           </div>
@@ -57,14 +68,6 @@ export function ChangelogView() {
             <p className="text-xs text-muted-foreground">What's new in Kimai Tracker</p>
           </div>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => window.electronAPI.closeWindow()}
-          className="h-8 w-8"
-        >
-          <X className="h-4 w-4" />
-        </Button>
       </div>
 
       {/* Content */}
@@ -160,10 +163,10 @@ export function ChangelogView() {
       <div className="p-3 border-t border-border bg-muted/20">
         <Button
           variant="outline"
-          onClick={() => window.electronAPI.closeWindow()}
+          onClick={goBack}
           className="w-full"
         >
-          Close
+          Back
         </Button>
       </div>
     </div>

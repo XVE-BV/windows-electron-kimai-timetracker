@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   Clock, Calendar, FileText, Loader2, ChevronRight, Search, X,
-  Users, Layers, Activity, Ticket, Briefcase, Timer, Check
+  Users, Layers, Activity, Ticket, Briefcase, Timer, Check, ArrowLeft
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -273,13 +273,17 @@ export function TimeEntryView() {
         }
       }
 
-      window.electronAPI.closeWindow();
+      window.electronAPI.openTray();
     } catch (error) {
       console.error('Failed to save:', error);
       alert('Failed to save time entry');
     } finally {
       setSaving(false);
     }
+  };
+
+  const goBack = () => {
+    window.electronAPI?.openTray();
   };
 
   // Filtered lists
@@ -565,8 +569,15 @@ export function TimeEntryView() {
   return (
     <div className="w-full bg-background overflow-hidden h-screen flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">
+      <div className="p-3 border-b border-border bg-gradient-to-r from-primary/10 to-primary/5">
         <div className="flex items-center gap-3">
+          <button
+            onClick={goBack}
+            className="p-2 hover:bg-muted rounded-lg transition-colors"
+            aria-label="Go back"
+          >
+            <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+          </button>
           <div className="p-2 bg-primary/20 rounded-lg">
             <Clock className="h-5 w-5 text-primary" />
           </div>
@@ -736,7 +747,7 @@ export function TimeEntryView() {
       <div className="p-3 border-t border-border bg-muted/20 flex gap-2">
         <Button
           variant="outline"
-          onClick={() => window.electronAPI.closeWindow()}
+          onClick={goBack}
           className="flex-1"
         >
           Cancel

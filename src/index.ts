@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell, net } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell, net, screen } from 'electron';
 import * as path from 'path';
 import { kimaiAPI } from './services/kimai';
 import { activityWatchAPI } from './services/activitywatch';
@@ -36,10 +36,6 @@ if (require('electron-squirrel-startup')) {
 let tray: Tray | null = null;
 let mainWindow: BrowserWindow | null = null;
 let trayWindow: BrowserWindow | null = null;
-let settingsWindow: BrowserWindow | null = null;
-let timeEntryWindow: BrowserWindow | null = null;
-let changelogWindow: BrowserWindow | null = null;
-let debugWindow: BrowserWindow | null = null;
 
 // Debug log buffer
 interface LogEntry {
@@ -200,7 +196,7 @@ async function buildContextMenu(): Promise<Menu> {
     // Manual Time Entry
     {
       label: 'Add Manual Entry...',
-      click: openTimeEntryWindow,
+      click: () => navigateTrayWindow('time-entry'),
     },
 
     // ActivityWatch
@@ -213,7 +209,7 @@ async function buildContextMenu(): Promise<Menu> {
     // Settings
     {
       label: 'Settings...',
-      click: openSettingsWindow,
+      click: () => navigateTrayWindow('settings'),
     },
     { type: 'separator' },
 
@@ -410,11 +406,18 @@ function createMainWindow(): void {
 }
 
 function createTrayWindow(): void {
+  // Get primary display dimensions for full height
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { height: screenHeight } = primaryDisplay.workAreaSize;
+
   trayWindow = new BrowserWindow({
     width: TRAY_WINDOW_WIDTH,
-    height: TRAY_WINDOW_HEIGHT,
+    height: screenHeight,
+    minWidth: TRAY_WINDOW_WIDTH,
+    minHeight: 400,
+    maxWidth: 600,
     show: false,
-    resizable: false,
+    resizable: true,
     minimizable: true,
     maximizable: false,
     title: 'Kimai Time Tracker',
@@ -455,120 +458,19 @@ function toggleTrayWindow(): void {
   }
 }
 
-function openSettingsWindow(): void {
-  if (settingsWindow && !settingsWindow.isDestroyed()) {
-    settingsWindow.focus();
-    return;
+function navigateTrayWindow(hash: string): void {
+  if (!trayWindow || trayWindow.isDestroyed()) {
+    createTrayWindow();
   }
 
-  settingsWindow = new BrowserWindow({
-    width: 500,
-    height: 600,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    title: 'Settings',
-    icon: createTrayIcon(),
-    webPreferences: {
-      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  settingsWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#settings`);
-  settingsWindow.setMenu(null);
-
-  settingsWindow.on('closed', () => {
-    settingsWindow = null;
-  });
-}
-
-function openTimeEntryWindow(): void {
-  if (timeEntryWindow && !timeEntryWindow.isDestroyed()) {
-    timeEntryWindow.focus();
-    return;
+  if (trayWindow) {
+    trayWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#${hash}`);
+    if (!trayWindow.isVisible()) {
+      trayWindow.center();
+      trayWindow.show();
+    }
+    trayWindow.focus();
   }
-
-  timeEntryWindow = new BrowserWindow({
-    width: 500,
-    height: 500,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    title: 'Add Time Entry',
-    icon: createTrayIcon(),
-    webPreferences: {
-      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  timeEntryWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#time-entry`);
-  timeEntryWindow.setMenu(null);
-
-  timeEntryWindow.on('closed', () => {
-    timeEntryWindow = null;
-  });
-}
-
-function openChangelogWindow(): void {
-  if (changelogWindow && !changelogWindow.isDestroyed()) {
-    changelogWindow.focus();
-    return;
-  }
-
-  changelogWindow = new BrowserWindow({
-    width: 450,
-    height: 500,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    title: 'Changelog',
-    icon: createTrayIcon(),
-    webPreferences: {
-      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  changelogWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#changelog`);
-  changelogWindow.setMenu(null);
-
-  changelogWindow.on('closed', () => {
-    changelogWindow = null;
-  });
-}
-
-function openDebugWindow(): void {
-  if (debugWindow && !debugWindow.isDestroyed()) {
-    debugWindow.focus();
-    return;
-  }
-
-  debugWindow = new BrowserWindow({
-    width: 500,
-    height: 600,
-    resizable: true,
-    minimizable: true,
-    maximizable: false,
-    title: 'Debug',
-    icon: createTrayIcon(),
-    webPreferences: {
-      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
-      contextIsolation: true,
-      nodeIntegration: false,
-    },
-  });
-
-  debugWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#debug`);
-  debugWindow.setMenu(null);
-
-  debugWindow.on('closed', () => {
-    debugWindow = null;
-  });
 }
 
 async function openActivitySummary(): Promise<void> {
@@ -699,16 +601,16 @@ function setupIPC(): void {
 
   // Window
   ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, () => {
-    if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
-    openSettingsWindow();
+    navigateTrayWindow('settings');
   });
   ipcMain.handle(IPC_CHANNELS.OPEN_TIME_ENTRY, () => {
-    if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
-    openTimeEntryWindow();
+    navigateTrayWindow('time-entry');
   });
   ipcMain.handle(IPC_CHANNELS.OPEN_CHANGELOG, () => {
-    if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
-    openChangelogWindow();
+    navigateTrayWindow('changelog');
+  });
+  ipcMain.handle(IPC_CHANNELS.OPEN_TRAY, () => {
+    navigateTrayWindow('tray');
   });
   ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL, (_, url: string) => {
     if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
@@ -797,8 +699,7 @@ function setupIPC(): void {
   });
 
   ipcMain.handle(IPC_CHANNELS.OPEN_DEBUG, () => {
-    if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
-    openDebugWindow();
+    navigateTrayWindow('debug');
   });
 
   // GitHub

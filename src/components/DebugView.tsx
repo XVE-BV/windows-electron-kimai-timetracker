@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Trash2, AlertTriangle, Bug, Copy, Check } from 'lucide-react';
+import { RefreshCw, Trash2, AlertTriangle, Bug, Copy, Check, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface ProcessInfo {
@@ -106,12 +106,23 @@ export function DebugView() {
   const otherProcessCount = processes.filter(p => !p.isCurrent).length;
   const errorCount = logs.filter(l => l.level === 'error').length;
 
+  const goBack = () => {
+    window.electronAPI?.openTray();
+  };
+
   return (
     <div className="w-full h-screen bg-background flex flex-col">
       {/* Header */}
-      <div className="p-4 border-b border-border">
+      <div className="p-3 border-b border-border">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
+            <button
+              onClick={goBack}
+              className="p-2 hover:bg-muted rounded-lg transition-colors"
+              aria-label="Go back"
+            >
+              <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+            </button>
             <Bug className="h-5 w-5 text-muted-foreground" />
             <h1 className="text-lg font-semibold">Debug View</h1>
           </div>

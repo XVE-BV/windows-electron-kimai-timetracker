@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Link, Activity, CheckCircle, XCircle, Loader2, Ticket } from 'lucide-react';
+import { Settings, Link, Activity, CheckCircle, XCircle, Loader2, Ticket, ArrowLeft } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -219,7 +219,7 @@ export function SettingsView() {
     };
 
     await window.electronAPI.saveSettings(newSettings);
-    window.electronAPI.closeWindow();
+    window.electronAPI.openTray();
   };
 
   const handleUseDefaultsChange = (checked: boolean) => {
@@ -262,15 +262,26 @@ export function SettingsView() {
     }
   };
 
+  const goBack = () => {
+    window.electronAPI?.openTray();
+  };
+
   return (
-    <div className="p-6 max-w-lg mx-auto space-y-6">
-      <div className="flex items-center gap-3 mb-8">
+    <div className="p-4 max-w-lg mx-auto space-y-4 h-screen overflow-auto">
+      <div className="flex items-center gap-3 mb-4">
+        <button
+          onClick={goBack}
+          className="p-2 hover:bg-muted rounded-lg transition-colors"
+          aria-label="Go back"
+        >
+          <ArrowLeft className="h-5 w-5 text-muted-foreground" />
+        </button>
         <div className="p-2 bg-primary/10 rounded-lg">
-          <Settings className="h-6 w-6 text-primary" />
+          <Settings className="h-5 w-5 text-primary" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold">Settings</h1>
-          <p className="text-sm text-muted-foreground">Configure your time tracking</p>
+          <h1 className="text-xl font-bold">Settings</h1>
+          <p className="text-xs text-muted-foreground">Configure your time tracking</p>
         </div>
       </div>
 
@@ -509,8 +520,8 @@ export function SettingsView() {
       </Card>
 
       {/* Actions */}
-      <div className="flex justify-end gap-3 pt-4">
-        <Button variant="outline" onClick={() => window.electronAPI?.closeWindow()}>
+      <div className="flex justify-end gap-3 pt-4 pb-4">
+        <Button variant="outline" onClick={goBack}>
           Cancel
         </Button>
         <Button onClick={saveSettings}>
