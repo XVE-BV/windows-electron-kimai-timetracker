@@ -10,6 +10,17 @@ import {
   updateTimerState,
 } from './services/store';
 import { IPC_CHANNELS, AppSettings, KimaiProject, KimaiActivity, WorkSessionState } from './types';
+import {
+  validateAppSettings,
+  validateOptionalPositiveInt,
+  validateStrictPositiveInt,
+  validateOptionalString,
+  validateNonEmptyString,
+  validateISODateString,
+  validateTimesheetCreate,
+  sanitizeJql,
+} from './validation';
+import { ValidationError, getUserMessage } from './errors';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -548,24 +559,39 @@ async function openActivitySummary(): Promise<void> {
 function setupIPC(): void {
   // Settings
   ipcMain.handle(IPC_CHANNELS.GET_SETTINGS, () => getSettings());
-  ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, async (_, settings: AppSettings) => {
-    saveSettings(settings);
-    await updateTrayMenu();
-    // Notify tray window to refresh
-    if (trayWindow && !trayWindow.isDestroyed()) {
-      trayWindow.webContents.send('settings-changed');
+  ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, async (_, settings: unknown) => {
+    try {
+      const validatedSettings = validateAppSettings(settings);
+      saveSettings(validatedSettings);
+      await updateTrayMenu();
+      // Notify tray window to refresh
+      if (trayWindow && !trayWindow.isDestroyed()) {
+        trayWindow.webContents.send('settings-changed');
+      }
+      return { success: true };
+    } catch (error) {
+      console.error('Failed to save settings:', error);
+      return { success: false, message: getUserMessage(error) };
     }
-    return { success: true };
   });
 
   // Kimai
   ipcMain.handle(IPC_CHANNELS.KIMAI_TEST_CONNECTION, () => kimaiAPI.testConnection());
   ipcMain.handle(IPC_CHANNELS.KIMAI_GET_CUSTOMERS, () => kimaiAPI.getCustomers());
-  ipcMain.handle(IPC_CHANNELS.KIMAI_GET_PROJECTS, (_, customerId?: number) => kimaiAPI.getProjects(customerId));
-  ipcMain.handle(IPC_CHANNELS.KIMAI_GET_ACTIVITIES, (_, projectId?: number) => kimaiAPI.getActivities(projectId));
+  ipcMain.handle(IPC_CHANNELS.KIMAI_GET_PROJECTS, (_, customerId?: unknown) => {
+    const validated = validateOptionalPositiveInt(customerId, 'customerId');
+    return kimaiAPI.getProjects(validated);
+  });
+  ipcMain.handle(IPC_CHANNELS.KIMAI_GET_ACTIVITIES, (_, projectId?: unknown) => {
+    const validated = validateOptionalPositiveInt(projectId, 'projectId');
+    return kimaiAPI.getActivities(validated);
+  });
   ipcMain.handle(IPC_CHANNELS.KIMAI_GET_TIMESHEETS, (_, params) => kimaiAPI.getTimesheets(params));
-  ipcMain.handle(IPC_CHANNELS.KIMAI_START_TIMER, async (_, projectId: number, activityId: number, description?: string) => {
-    updateTimerState({ projectId, activityId, description: description || '' });
+  ipcMain.handle(IPC_CHANNELS.KIMAI_START_TIMER, async (_, projectId: unknown, activityId: unknown, description?: unknown) => {
+    const validProjectId = validateStrictPositiveInt(projectId, 'projectId');
+    const validActivityId = validateStrictPositiveInt(activityId, 'activityId');
+    const validDescription = validateOptionalString(description, 'description') || '';
+    updateTimerState({ projectId: validProjectId, activityId: validActivityId, description: validDescription });
     await startTimer();
     return getTimerState();
   });
@@ -573,27 +599,47 @@ function setupIPC(): void {
     await stopTimer();
     return getTimerState();
   });
-  ipcMain.handle(IPC_CHANNELS.KIMAI_CREATE_TIMESHEET, (_, data) => kimaiAPI.createTimesheet(data));
-  ipcMain.handle(IPC_CHANNELS.KIMAI_DELETE_TIMESHEET, (_, id: number) => kimaiAPI.deleteTimesheet(id));
+  ipcMain.handle(IPC_CHANNELS.KIMAI_CREATE_TIMESHEET, (_, data: unknown) => {
+    const validated = validateTimesheetCreate(data);
+    return kimaiAPI.createTimesheet(validated);
+  });
+  ipcMain.handle(IPC_CHANNELS.KIMAI_DELETE_TIMESHEET, (_, id: unknown) => {
+    const validated = validateStrictPositiveInt(id, 'id');
+    return kimaiAPI.deleteTimesheet(validated);
+  });
 
   // ActivityWatch
   ipcMain.handle(IPC_CHANNELS.AW_GET_BUCKETS, () => activityWatchAPI.getBuckets());
-  ipcMain.handle(IPC_CHANNELS.AW_GET_EVENTS, (_, bucketId: string, start?: string, end?: string, limit?: number) =>
-    activityWatchAPI.getEvents(bucketId, start, end, limit)
-  );
-  ipcMain.handle(IPC_CHANNELS.AW_GET_ACTIVITY_SUMMARY, (_, minutes?: number) =>
-    activityWatchAPI.getRecentActivity(minutes)
-  );
+  ipcMain.handle(IPC_CHANNELS.AW_GET_EVENTS, (_, bucketId: unknown, start?: unknown, end?: unknown, limit?: unknown) => {
+    const validBucketId = validateNonEmptyString(bucketId, 'bucketId');
+    const validStart = start ? validateOptionalString(start, 'start') : undefined;
+    const validEnd = end ? validateOptionalString(end, 'end') : undefined;
+    const validLimit = validateOptionalPositiveInt(limit, 'limit');
+    return activityWatchAPI.getEvents(validBucketId, validStart, validEnd, validLimit);
+  });
+  ipcMain.handle(IPC_CHANNELS.AW_GET_ACTIVITY_SUMMARY, (_, minutes?: unknown) => {
+    const validated = validateOptionalPositiveInt(minutes, 'minutes');
+    return activityWatchAPI.getRecentActivity(validated);
+  });
 
   // Jira
   ipcMain.handle(IPC_CHANNELS.JIRA_TEST_CONNECTION, () => jiraAPI.testConnection());
-  ipcMain.handle(IPC_CHANNELS.JIRA_GET_MY_ISSUES, (_, maxResults?: number) => jiraAPI.getMyIssues(maxResults));
-  ipcMain.handle(IPC_CHANNELS.JIRA_SEARCH_ISSUES, (_, jql: string, maxResults?: number) =>
-    jiraAPI.searchIssues(jql, maxResults)
-  );
-  ipcMain.handle(IPC_CHANNELS.JIRA_ADD_WORKLOG, (_, issueKey: string, timeSpentSeconds: number, started: string, comment?: string) =>
-    jiraAPI.addWorklog(issueKey, timeSpentSeconds, new Date(started), comment)
-  );
+  ipcMain.handle(IPC_CHANNELS.JIRA_GET_MY_ISSUES, (_, maxResults?: unknown) => {
+    const validated = validateOptionalPositiveInt(maxResults, 'maxResults');
+    return jiraAPI.getMyIssues(validated);
+  });
+  ipcMain.handle(IPC_CHANNELS.JIRA_SEARCH_ISSUES, (_, jql: unknown, maxResults?: unknown) => {
+    const validJql = sanitizeJql(validateNonEmptyString(jql, 'jql'));
+    const validMaxResults = validateOptionalPositiveInt(maxResults, 'maxResults');
+    return jiraAPI.searchIssues(validJql, validMaxResults);
+  });
+  ipcMain.handle(IPC_CHANNELS.JIRA_ADD_WORKLOG, (_, issueKey: unknown, timeSpentSeconds: unknown, started: unknown, comment?: unknown) => {
+    const validIssueKey = validateNonEmptyString(issueKey, 'issueKey');
+    const validTimeSpent = validateStrictPositiveInt(timeSpentSeconds, 'timeSpentSeconds');
+    const validStarted = validateISODateString(started, 'started');
+    const validComment = validateOptionalString(comment, 'comment');
+    return jiraAPI.addWorklog(validIssueKey, validTimeSpent, new Date(validStarted), validComment);
+  });
 
   // Timer State
   ipcMain.handle(IPC_CHANNELS.GET_TIMER_STATE, () => getTimerState());

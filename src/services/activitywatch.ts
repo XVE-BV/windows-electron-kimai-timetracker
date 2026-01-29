@@ -1,6 +1,8 @@
 import { net } from 'electron';
 import { getSettings } from './store';
 import { AWBucket, AWBuckets, AWEvent } from '../types';
+import { REQUEST_TIMEOUT_MS } from '../constants';
+import { NetworkError, TimeoutError, errorFromStatus } from '../errors';
 
 interface ActivitySummary {
   app: string;
@@ -9,6 +11,11 @@ interface ActivitySummary {
 }
 
 class ActivityWatchAPI {
+  // Cache buckets to avoid repeated lookups
+  private bucketsCache: AWBuckets | null = null;
+  private bucketsCacheTime: number = 0;
+  private readonly CACHE_TTL_MS = 60000; // 1 minute
+
   private getBaseUrl(): string {
     const settings = getSettings();
     return settings.activityWatch.apiUrl.replace(/\/$/, '');
@@ -19,13 +26,32 @@ class ActivityWatchAPI {
     endpoint: string,
     body?: unknown
   ): Promise<T> {
-    const url = `${this.getBaseUrl()}/api${endpoint}`;
+    const baseUrl = this.getBaseUrl();
+    if (!baseUrl) {
+      throw new NetworkError('ActivityWatch API URL not configured');
+    }
+
+    const url = `${baseUrl}/api${endpoint}`;
 
     return new Promise((resolve, reject) => {
       const request = net.request({
         method,
         url,
       });
+
+      // Set timeout
+      let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
+        timeoutId = null;
+        request.abort();
+        reject(new TimeoutError('ActivityWatch request timed out'));
+      }, REQUEST_TIMEOUT_MS);
+
+      const clearTimeoutSafe = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
 
       request.setHeader('Content-Type', 'application/json');
       request.setHeader('Accept', 'application/json');
@@ -38,7 +64,10 @@ class ActivityWatchAPI {
         });
 
         response.on('end', () => {
-          if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) {
+          clearTimeoutSafe();
+          const statusCode = response.statusCode || 0;
+
+          if (statusCode >= 200 && statusCode < 300) {
             try {
               const parsed = responseData ? JSON.parse(responseData) : null;
               resolve(parsed as T);
@@ -46,17 +75,19 @@ class ActivityWatchAPI {
               resolve(responseData as unknown as T);
             }
           } else {
-            reject(new Error(`HTTP ${response.statusCode}: ${responseData}`));
+            reject(errorFromStatus(statusCode, responseData));
           }
         });
 
         response.on('error', (error) => {
-          reject(error);
+          clearTimeoutSafe();
+          reject(new NetworkError(error.message));
         });
       });
 
       request.on('error', (error) => {
-        reject(error);
+        clearTimeoutSafe();
+        reject(new NetworkError(error.message));
       });
 
       if (body) {
@@ -73,10 +104,19 @@ class ActivityWatchAPI {
       return {};
     }
 
+    // Check cache
+    const now = Date.now();
+    if (this.bucketsCache && (now - this.bucketsCacheTime) < this.CACHE_TTL_MS) {
+      return this.bucketsCache;
+    }
+
     try {
-      return await this.request<AWBuckets>('GET', '/0/buckets/');
-    } catch {
-      console.error('Failed to get ActivityWatch buckets');
+      const buckets = await this.request<AWBuckets>('GET', '/0/buckets/');
+      this.bucketsCache = buckets;
+      this.bucketsCacheTime = now;
+      return buckets;
+    } catch (error) {
+      console.error('Failed to get ActivityWatch buckets:', error instanceof Error ? error.message : error);
       return {};
     }
   }
@@ -102,8 +142,8 @@ class ActivityWatchAPI {
 
     try {
       return await this.request<AWEvent[]>('GET', endpoint);
-    } catch {
-      console.error(`Failed to get events for bucket: ${bucketId}`);
+    } catch (error) {
+      console.error(`Failed to get events for bucket ${bucketId}:`, error instanceof Error ? error.message : error);
       return [];
     }
   }
@@ -190,12 +230,22 @@ class ActivityWatchAPI {
 
   async testConnection(): Promise<{ success: boolean; message: string }> {
     try {
+      // Clear cache to force fresh request
+      this.bucketsCache = null;
       await this.getBuckets();
       return { success: true, message: 'ActivityWatch connection successful!' };
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       return { success: false, message };
     }
+  }
+
+  /**
+   * Clear the buckets cache (useful when settings change)
+   */
+  clearCache(): void {
+    this.bucketsCache = null;
+    this.bucketsCacheTime = 0;
   }
 }
 

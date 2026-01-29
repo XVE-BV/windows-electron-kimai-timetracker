@@ -7,6 +7,8 @@ import {
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState } from '../types';
+import { formatDuration as formatDurationUtil, formatDurationHuman } from '../utils';
+import { DATA_REFRESH_INTERVAL_MS, TIMER_UPDATE_INTERVAL_MS, MAX_RECENT_TIMESHEETS, MAX_ACTIVITY_SUMMARY_ITEMS, MAX_JIRA_ISSUES } from '../constants';
 
 interface ActivitySummaryItem {
   app: string;
@@ -31,8 +33,9 @@ export function TrayView() {
   const [weekTotal, setWeekTotal] = useState(0);
   const [activitySummary, setActivitySummary] = useState<ActivitySummaryItem[]>([]);
   const [connectionStatus, setConnectionStatus] = useState<'connected' | 'disconnected' | 'checking'>('checking');
-  const [awStatus, setAwStatus] = useState<'connected' | 'disconnected' | 'disabled'>('checking' as any);
+  const [awStatus, setAwStatus] = useState<'connected' | 'disconnected' | 'disabled'>('disconnected');
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isTimerLoading, setIsTimerLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [description, setDescription] = useState('');
 
@@ -46,14 +49,8 @@ export function TrayView() {
   // Work session state
   const [workSession, setWorkSession] = useState<WorkSessionState>({ status: 'stopped', startedAt: null });
 
-  const formatDuration = (seconds: number): string => {
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    if (hours > 0) {
-      return `${hours}h ${minutes}m`;
-    }
-    return `${minutes}m`;
-  };
+  // Use imported formatDurationHuman for display
+  const formatDuration = formatDurationHuman;
 
   const formatTimesheetTime = (dateStr: string): string => {
     const date = new Date(dateStr);
@@ -79,7 +76,7 @@ export function TrayView() {
       setWorkSession(sessionState);
 
       // Load timer state
-      const state = await window.electronAPI.getTimerState() as TimerState;
+      const state = await window.electronAPI.getTimerState();
       setTimerState(state);
 
       // Load description from running timer
@@ -88,11 +85,11 @@ export function TrayView() {
       }
 
       // Load customers
-      const custs = await window.electronAPI.kimaiGetCustomers() as KimaiCustomer[];
+      const custs = await window.electronAPI.kimaiGetCustomers();
       setCustomers(custs);
 
       // Load all projects
-      const projs = await window.electronAPI.kimaiGetProjects() as KimaiProject[];
+      const projs = await window.electronAPI.kimaiGetProjects();
       setAllProjects(projs);
       setConnectionStatus('connected');
 
@@ -108,7 +105,7 @@ export function TrayView() {
           setProjects(projs.filter(p => p.customer === proj.customer));
         }
 
-        const acts = await window.electronAPI.kimaiGetActivities(state.projectId) as KimaiActivity[];
+        const acts = await window.electronAPI.kimaiGetActivities(state.projectId);
         setActivities(acts);
 
         if (state.activityId) {
@@ -117,7 +114,7 @@ export function TrayView() {
         }
       } else {
         // Timer not running - load defaults from settings if enabled
-        const settings = await window.electronAPI.getSettings() as AppSettings;
+        const settings = await window.electronAPI.getSettings();
         if (settings.useDefaults) {
           if (settings.defaultCustomerId) {
             const cust = custs.find(c => c.id === settings.defaultCustomerId);
@@ -131,7 +128,7 @@ export function TrayView() {
             setSelectedProject(proj || null);
 
             if (proj) {
-              const acts = await window.electronAPI.kimaiGetActivities(settings.defaultProjectId) as KimaiActivity[];
+              const acts = await window.electronAPI.kimaiGetActivities(settings.defaultProjectId);
               setActivities(acts);
 
               if (settings.defaultActivityId) {
@@ -155,9 +152,9 @@ export function TrayView() {
       today.setHours(0, 0, 0, 0);
       const timesheets = await window.electronAPI.kimaiGetTimesheets({
         begin: formatDateForAPI(today),
-      }) as KimaiTimesheet[];
+      });
 
-      setTodayTimesheets(timesheets.slice(0, 5)); // Last 5 entries
+      setTodayTimesheets(timesheets.slice(0, MAX_RECENT_TIMESHEETS));
 
       // Calculate today's total
       const totalSeconds = timesheets.reduce((acc, ts) => acc + (ts.duration || 0), 0);
@@ -169,7 +166,7 @@ export function TrayView() {
       weekStart.setHours(0, 0, 0, 0);
       const weekTimesheets = await window.electronAPI.kimaiGetTimesheets({
         begin: formatDateForAPI(weekStart),
-      }) as KimaiTimesheet[];
+      });
       const weekSeconds = weekTimesheets.reduce((acc, ts) => acc + (ts.duration || 0), 0);
       setWeekTotal(weekSeconds);
 
@@ -180,8 +177,8 @@ export function TrayView() {
 
     // Load ActivityWatch summary
     try {
-      const summary = await window.electronAPI.awGetActivitySummary(60) as ActivitySummaryItem[];
-      setActivitySummary(summary.slice(0, 4));
+      const summary = await window.electronAPI.awGetActivitySummary(60);
+      setActivitySummary(summary.slice(0, MAX_ACTIVITY_SUMMARY_ITEMS));
       setAwStatus('connected');
     } catch (error) {
       console.error('Failed to load AW summary:', error);
@@ -190,10 +187,10 @@ export function TrayView() {
 
     // Load Jira issues if enabled
     try {
-      const settings = await window.electronAPI.getSettings() as AppSettings;
+      const settings = await window.electronAPI.getSettings();
       if (settings.jira?.enabled) {
         setJiraEnabled(true);
-        const issues = await window.electronAPI.jiraGetMyIssues(10) as JiraIssue[];
+        const issues = await window.electronAPI.jiraGetMyIssues(MAX_JIRA_ISSUES);
         setJiraIssues(issues);
         setJiraStatus('connected');
       } else {
@@ -202,18 +199,17 @@ export function TrayView() {
       }
     } catch (error) {
       console.error('Failed to load Jira issues:', error);
-      if (jiraEnabled) {
-        setJiraStatus('disconnected');
-      }
+      // Check current jira enabled state via settings fetch
+      setJiraStatus('disconnected');
     }
 
     setIsRefreshing(false);
-  }, [jiraEnabled]);
+  }, []); // Empty dependency array - all setters are stable
 
   useEffect(() => {
     loadData();
-    const interval = setInterval(updateElapsedTime, 1000);
-    const dataInterval = setInterval(loadData, 60000); // Refresh data every minute
+    const interval = setInterval(updateElapsedTime, TIMER_UPDATE_INTERVAL_MS);
+    const dataInterval = setInterval(loadData, DATA_REFRESH_INTERVAL_MS);
 
     // Listen for settings changes
     const unsubscribe = window.electronAPI?.onSettingsChanged?.(() => {
@@ -254,44 +250,53 @@ export function TrayView() {
   };
 
   const handleStartStop = async () => {
-    if (!window.electronAPI) return;
-    if (timerState?.isRunning) {
-      // Store Jira issue before clearing state
-      const jiraIssueToLog = selectedJiraIssue;
-      const timerStartTime = timerState.startTime;
+    if (!window.electronAPI || isTimerLoading) return;
 
-      await window.electronAPI.kimaiStopTimer();
+    setIsTimerLoading(true);
+    try {
+      if (timerState?.isRunning) {
+        // Store Jira issue before clearing state
+        const jiraIssueToLog = selectedJiraIssue;
+        const timerStartTime = timerState.startTime;
 
-      // Log to Jira if a ticket was linked
-      if (jiraIssueToLog && timerStartTime && jiraEnabled) {
-        try {
-          const startDate = new Date(timerStartTime);
-          const endDate = new Date();
-          let durationSeconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000);
+        await window.electronAPI.kimaiStopTimer();
 
-          // Enforce minimum 15 minutes (same as Kimai)
-          if (durationSeconds < 900) {
-            durationSeconds = 900;
+        // Log to Jira if a ticket was linked
+        if (jiraIssueToLog && timerStartTime && jiraEnabled) {
+          try {
+            const startDate = new Date(timerStartTime);
+            const endDate = new Date();
+            let durationSeconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000);
+
+            // Enforce minimum 15 minutes (same as Kimai)
+            if (durationSeconds < 900) {
+              durationSeconds = 900;
+            }
+
+            await window.electronAPI.jiraAddWorklog(
+              jiraIssueToLog.key,
+              durationSeconds,
+              startDate.toISOString(),
+              description || undefined
+            );
+            console.log(`Logged ${durationSeconds}s to Jira ${jiraIssueToLog.key}`);
+          } catch (error) {
+            // TODO: Show user notification about Jira failure
+            console.error('Failed to log to Jira:', error);
           }
-
-          await window.electronAPI.jiraAddWorklog(
-            jiraIssueToLog.key,
-            durationSeconds,
-            startDate.toISOString(),
-            description || undefined
-          );
-          console.log(`Logged ${durationSeconds}s to Jira ${jiraIssueToLog.key}`);
-        } catch (error) {
-          console.error('Failed to log to Jira:', error);
         }
-      }
 
-      setDescription(''); // Clear description after stopping
-      setSelectedJiraIssue(null); // Clear Jira issue after stopping
-    } else if (selectedProject && selectedActivity) {
-      await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
+        setDescription(''); // Clear description after stopping
+        setSelectedJiraIssue(null); // Clear Jira issue after stopping
+      } else if (selectedProject && selectedActivity) {
+        await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
+      }
+      await loadData();
+    } catch (error) {
+      console.error('Timer operation failed:', error);
+    } finally {
+      setIsTimerLoading(false);
     }
-    loadData();
   };
 
   const handleDeleteTimesheet = async (id: number) => {
@@ -336,7 +341,7 @@ export function TrayView() {
     if (!window.electronAPI) return;
     setSelectedProject(project);
     setSelectedActivity(null);
-    const acts = await window.electronAPI.kimaiGetActivities(project.id) as KimaiActivity[];
+    const acts = await window.electronAPI.kimaiGetActivities(project.id);
     setActivities(acts);
     setSearchQuery('');
     setView('activities');
@@ -392,30 +397,26 @@ export function TrayView() {
         matchedCustomer = findBestMatch(jiraProjectName);
       }
 
-      // Auto-select the matched customer, project, and activity
+      // Auto-select the matched customer and load projects
       if (matchedCustomer) {
         setSelectedCustomer(matchedCustomer);
         const filteredProjects = allProjects.filter(p => p.customer === matchedCustomer.id);
         setProjects(filteredProjects);
 
-        // Auto-select project matching "regiewerk"
-        const matchedProject = filteredProjects.find(p =>
-          p.name.toLowerCase().includes('regiewerk')
-        );
-        if (matchedProject) {
-          setSelectedProject(matchedProject);
+        // Auto-select first project if only one available
+        if (filteredProjects.length === 1) {
+          const proj = filteredProjects[0];
+          setSelectedProject(proj);
 
-          // Load activities for this project and auto-select one matching "werk"
+          // Load activities for this project
           if (window.electronAPI) {
             try {
-              const acts = await window.electronAPI.kimaiGetActivities(matchedProject.id) as KimaiActivity[];
+              const acts = await window.electronAPI.kimaiGetActivities(proj.id);
               setActivities(acts);
 
-              const matchedActivity = acts.find(a =>
-                a.name.toLowerCase().includes('werk')
-              );
-              if (matchedActivity) {
-                setSelectedActivity(matchedActivity);
+              // Auto-select first activity if only one available
+              if (acts.length === 1) {
+                setSelectedActivity(acts[0]);
               }
             } catch (error) {
               console.error('Failed to load activities:', error);
@@ -751,6 +752,7 @@ export function TrayView() {
               onClick={loadData}
               disabled={isRefreshing}
               className="p-1 hover:bg-muted rounded"
+              aria-label="Refresh data"
             >
               <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
@@ -995,11 +997,16 @@ export function TrayView() {
       <div className="px-2 pb-2">
         <Button
           onClick={handleStartStop}
-          disabled={!timerState?.isRunning && (!selectedProject || !selectedActivity)}
+          disabled={isTimerLoading || (!timerState?.isRunning && (!selectedProject || !selectedActivity))}
           className={`w-full ${timerState?.isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
           size="lg"
         >
-          {timerState?.isRunning ? (
+          {isTimerLoading ? (
+            <>
+              <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+              {timerState?.isRunning ? 'Stopping...' : 'Starting...'}
+            </>
+          ) : timerState?.isRunning ? (
             <>
               <Square className="h-4 w-4 mr-2" />
               Stop Timer
@@ -1038,6 +1045,7 @@ export function TrayView() {
                     onClick={() => handleDeleteTimesheet(ts.id)}
                     className="p-1 opacity-0 group-hover:opacity-100 hover:bg-red-100 rounded transition-opacity"
                     title="Delete entry"
+                    aria-label="Delete time entry"
                   >
                     <Trash2 className="h-3 w-3 text-red-500" />
                   </button>

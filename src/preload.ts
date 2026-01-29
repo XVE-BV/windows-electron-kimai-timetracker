@@ -1,5 +1,25 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS, AppSettings, KimaiTimesheetCreate, WorkSessionState } from './types';
+import {
+  IPC_CHANNELS,
+  AppSettings,
+  KimaiTimesheetCreate,
+  WorkSessionState,
+  KimaiCustomer,
+  KimaiProject,
+  KimaiActivity,
+  KimaiTimesheet,
+  TimerState,
+  AWBuckets,
+  AWEvent,
+  JiraIssue,
+} from './types';
+
+// Activity summary type (returned by ActivityWatch service)
+interface ActivitySummaryItem {
+  app: string;
+  title: string;
+  duration: number;
+}
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -61,24 +81,24 @@ contextBridge.exposeInMainWorld('electronAPI', {
 // Type definitions for the exposed API
 export interface ElectronAPI {
   getSettings: () => Promise<AppSettings>;
-  saveSettings: (settings: AppSettings) => Promise<{ success: boolean }>;
+  saveSettings: (settings: AppSettings) => Promise<{ success: boolean; message?: string }>;
   kimaiTestConnection: () => Promise<{ success: boolean; message: string }>;
-  kimaiGetCustomers: () => Promise<unknown[]>;
-  kimaiGetProjects: (customerId?: number) => Promise<unknown[]>;
-  kimaiGetActivities: (projectId?: number) => Promise<unknown[]>;
-  kimaiGetTimesheets: (params?: { user?: string; begin?: string; end?: string; active?: boolean }) => Promise<unknown[]>;
-  kimaiStartTimer: (projectId: number, activityId: number, description?: string) => Promise<unknown>;
-  kimaiStopTimer: () => Promise<unknown>;
-  kimaiCreateTimesheet: (data: KimaiTimesheetCreate) => Promise<unknown>;
+  kimaiGetCustomers: () => Promise<KimaiCustomer[]>;
+  kimaiGetProjects: (customerId?: number) => Promise<KimaiProject[]>;
+  kimaiGetActivities: (projectId?: number) => Promise<KimaiActivity[]>;
+  kimaiGetTimesheets: (params?: { user?: string; begin?: string; end?: string; active?: boolean }) => Promise<KimaiTimesheet[]>;
+  kimaiStartTimer: (projectId: number, activityId: number, description?: string) => Promise<TimerState>;
+  kimaiStopTimer: () => Promise<TimerState>;
+  kimaiCreateTimesheet: (data: KimaiTimesheetCreate) => Promise<KimaiTimesheet>;
   kimaiDeleteTimesheet: (id: number) => Promise<void>;
-  awGetBuckets: () => Promise<unknown>;
-  awGetEvents: (bucketId: string, start?: string, end?: string, limit?: number) => Promise<unknown[]>;
-  awGetActivitySummary: (minutes?: number) => Promise<unknown[]>;
+  awGetBuckets: () => Promise<AWBuckets>;
+  awGetEvents: (bucketId: string, start?: string, end?: string, limit?: number) => Promise<AWEvent[]>;
+  awGetActivitySummary: (minutes?: number) => Promise<ActivitySummaryItem[]>;
   jiraTestConnection: () => Promise<{ success: boolean; message: string }>;
-  jiraGetMyIssues: (maxResults?: number) => Promise<unknown[]>;
-  jiraSearchIssues: (jql: string, maxResults?: number) => Promise<unknown[]>;
+  jiraGetMyIssues: (maxResults?: number) => Promise<JiraIssue[]>;
+  jiraSearchIssues: (jql: string, maxResults?: number) => Promise<JiraIssue[]>;
   jiraAddWorklog: (issueKey: string, timeSpentSeconds: number, started: string, comment?: string) => Promise<{ id: string }>;
-  getTimerState: () => Promise<unknown>;
+  getTimerState: () => Promise<TimerState>;
   workSessionStart: () => Promise<WorkSessionState>;
   workSessionPause: () => Promise<WorkSessionState>;
   workSessionStop: () => Promise<WorkSessionState>;

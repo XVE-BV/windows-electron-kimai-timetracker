@@ -7,6 +7,8 @@ import {
   KimaiTimesheet,
   KimaiTimesheetCreate,
 } from '../types';
+import { REQUEST_TIMEOUT_MS, KIMAI_MIN_DURATION_SECONDS } from '../constants';
+import { NetworkError, AuthenticationError, TimeoutError, errorFromStatus } from '../errors';
 
 class KimaiAPI {
   private getBaseUrl(): string {
@@ -28,7 +30,12 @@ class KimaiAPI {
     endpoint: string,
     body?: unknown
   ): Promise<T> {
-    const url = `${this.getBaseUrl()}/api${endpoint}`;
+    const baseUrl = this.getBaseUrl();
+    if (!baseUrl) {
+      throw new NetworkError('Kimai API URL not configured');
+    }
+
+    const url = `${baseUrl}/api${endpoint}`;
     const headers = this.getHeaders();
 
     return new Promise((resolve, reject) => {
@@ -36,6 +43,20 @@ class KimaiAPI {
         method,
         url,
       });
+
+      // Set timeout
+      let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
+        timeoutId = null;
+        request.abort();
+        reject(new TimeoutError('Kimai request timed out'));
+      }, REQUEST_TIMEOUT_MS);
+
+      const clearTimeoutSafe = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
 
       Object.entries(headers).forEach(([key, value]) => {
         request.setHeader(key, value);
@@ -49,25 +70,32 @@ class KimaiAPI {
         });
 
         response.on('end', () => {
-          if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) {
+          clearTimeoutSafe();
+          const statusCode = response.statusCode || 0;
+
+          if (statusCode >= 200 && statusCode < 300) {
             try {
               const parsed = responseData ? JSON.parse(responseData) : null;
               resolve(parsed as T);
             } catch {
               resolve(responseData as unknown as T);
             }
+          } else if (statusCode === 401 || statusCode === 403) {
+            reject(new AuthenticationError('Invalid Kimai credentials'));
           } else {
-            reject(new Error(`HTTP ${response.statusCode}: ${responseData}`));
+            reject(errorFromStatus(statusCode, responseData));
           }
         });
 
         response.on('error', (error) => {
-          reject(error);
+          clearTimeoutSafe();
+          reject(new NetworkError(error.message));
         });
       });
 
       request.on('error', (error) => {
-        reject(error);
+        clearTimeoutSafe();
+        reject(new NetworkError(error.message));
       });
 
       if (body) {
@@ -150,12 +178,11 @@ class KimaiAPI {
     // Stop the timer first
     const stoppedTimesheet = await this.stopTimesheet(timesheetId);
 
-    // Enforce minimum 15 minute duration
-    const minDurationSeconds = 15 * 60; // 15 minutes
-    if (stoppedTimesheet.duration < minDurationSeconds) {
-      // Calculate new end time: begin + 15 minutes
+    // Enforce minimum duration
+    if (stoppedTimesheet.duration < KIMAI_MIN_DURATION_SECONDS) {
+      // Calculate new end time: begin + minimum duration
       const beginDate = new Date(stoppedTimesheet.begin);
-      const newEndDate = new Date(beginDate.getTime() + minDurationSeconds * 1000);
+      const newEndDate = new Date(beginDate.getTime() + KIMAI_MIN_DURATION_SECONDS * 1000);
 
       // Update the timesheet with new end time
       return this.updateTimesheet(timesheetId, {

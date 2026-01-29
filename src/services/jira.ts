@@ -1,6 +1,8 @@
 import { net } from 'electron';
 import { getSettings } from './store';
 import { JiraIssue, JiraSearchResult } from '../types';
+import { REQUEST_TIMEOUT_MS } from '../constants';
+import { NetworkError, AuthenticationError, TimeoutError, errorFromStatus } from '../errors';
 
 class JiraAPI {
   private getBaseUrl(): string {
@@ -23,7 +25,12 @@ class JiraAPI {
     endpoint: string,
     body?: unknown
   ): Promise<T> {
-    const url = `${this.getBaseUrl()}/rest/api/3${endpoint}`;
+    const baseUrl = this.getBaseUrl();
+    if (!baseUrl) {
+      throw new NetworkError('Jira API URL not configured');
+    }
+
+    const url = `${baseUrl}/rest/api/3${endpoint}`;
     const headers = this.getHeaders();
 
     return new Promise((resolve, reject) => {
@@ -31,6 +38,20 @@ class JiraAPI {
         method,
         url,
       });
+
+      // Set timeout
+      let timeoutId: NodeJS.Timeout | null = setTimeout(() => {
+        timeoutId = null;
+        request.abort();
+        reject(new TimeoutError('Jira request timed out'));
+      }, REQUEST_TIMEOUT_MS);
+
+      const clearTimeoutSafe = () => {
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+      };
 
       Object.entries(headers).forEach(([key, value]) => {
         request.setHeader(key, value);
@@ -44,25 +65,32 @@ class JiraAPI {
         });
 
         response.on('end', () => {
-          if (response.statusCode && response.statusCode >= 200 && response.statusCode < 300) {
+          clearTimeoutSafe();
+          const statusCode = response.statusCode || 0;
+
+          if (statusCode >= 200 && statusCode < 300) {
             try {
               const parsed = responseData ? JSON.parse(responseData) : null;
               resolve(parsed as T);
             } catch {
               resolve(responseData as unknown as T);
             }
+          } else if (statusCode === 401 || statusCode === 403) {
+            reject(new AuthenticationError('Invalid Jira credentials'));
           } else {
-            reject(new Error(`HTTP ${response.statusCode}: ${responseData}`));
+            reject(errorFromStatus(statusCode, responseData));
           }
         });
 
         response.on('error', (error) => {
-          reject(error);
+          clearTimeoutSafe();
+          reject(new NetworkError(error.message));
         });
       });
 
       request.on('error', (error) => {
-        reject(error);
+        clearTimeoutSafe();
+        reject(new NetworkError(error.message));
       });
 
       if (body) {
