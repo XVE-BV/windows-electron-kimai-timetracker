@@ -587,7 +587,7 @@ export function TrayView() {
               placeholder="Search customers..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full pl-9 pr-8 py-2 text-sm bg-background border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
               autoFocus
             />
             {searchQuery && (
@@ -649,7 +649,7 @@ export function TrayView() {
               placeholder="Search projects..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full pl-9 pr-8 py-2 text-sm bg-background border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
               autoFocus
             />
             {searchQuery && (
@@ -709,7 +709,7 @@ export function TrayView() {
               placeholder="Search activities..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full pl-9 pr-8 py-2 text-sm bg-background border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
               autoFocus
             />
             {searchQuery && (
@@ -771,7 +771,7 @@ export function TrayView() {
               placeholder="Search tickets..."
               value={jiraSearchQuery}
               onChange={(e) => setJiraSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-8 py-2 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+              className="w-full pl-9 pr-8 py-2 text-sm bg-background border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary"
               autoFocus
             />
             {jiraSearchQuery && (
@@ -840,87 +840,36 @@ export function TrayView() {
         </div>
       )}
 
-      {/* Work Session Controls */}
-      <div className="p-2 border-b border-border bg-muted/20">
+      {/* Status Bar */}
+      <div className="px-3 py-2 border-b border-border bg-muted/20">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Clock className="h-4 w-4 text-muted-foreground" />
-            <span className="text-xs font-medium">
-              {workSession.status === 'stopped' && 'Not at work'}
-              {workSession.status === 'active' && 'Working'}
-              {workSession.status === 'paused' && 'On break'}
-            </span>
-            {workSession.status !== 'stopped' && !timerState?.isRunning && workSession.status === 'active' && (
+            {workSession.remindersEnabled && !timerState?.isRunning && (
               <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-600 rounded animate-pulse">
                 Not tracking!
               </span>
             )}
           </div>
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <button
               onClick={handleToggleReminders}
-              className={`p-1 rounded ${workSession.remindersEnabled ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
-              title={workSession.remindersEnabled ? 'Reminders on' : 'Reminders off'}
+              className={`p-1.5 rounded border ${workSession.remindersEnabled ? 'text-primary border-primary/50 bg-primary/10' : 'text-muted-foreground border-border hover:bg-muted'}`}
+              title={workSession.remindersEnabled ? 'Reminders on - click to disable' : 'Reminders off - click to enable'}
             >
-              {workSession.remindersEnabled ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+              {workSession.remindersEnabled ? <Bell className="h-4 w-4" /> : <BellOff className="h-4 w-4" />}
             </button>
             <button
               onClick={loadData}
               disabled={isRefreshing}
-              className="p-1 hover:bg-muted rounded"
+              className="p-1.5 hover:bg-muted rounded border border-border"
               aria-label="Refresh data"
             >
-              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+              <RefreshCw className={`h-4 w-4 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
             </button>
-            <div className="flex items-center gap-1 ml-1">
-              <div title={`Kimai: ${connectionStatus}`} className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
-              <div title={`ActivityWatch: ${awStatus}`} className={`h-2 w-2 rounded-full ${awStatus === 'connected' ? 'bg-blue-500' : awStatus === 'disabled' ? 'bg-gray-400' : 'bg-red-500'}`} />
+            <div className="flex items-center gap-1.5 ml-1">
+              <div title={`Kimai: ${connectionStatus}`} className={`h-2.5 w-2.5 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
+              <div title={`ActivityWatch: ${awStatus}`} className={`h-2.5 w-2.5 rounded-full ${awStatus === 'connected' ? 'bg-blue-500' : awStatus === 'disabled' ? 'bg-gray-400' : 'bg-red-500'}`} />
             </div>
-            {workSession.status === 'stopped' && (
-              <button
-                onClick={handleWorkSessionStart}
-                className="ml-1 px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1"
-              >
-                <Play className="h-3 w-3" />
-                Start
-              </button>
-            )}
-            {workSession.status === 'active' && (
-              <>
-                <button
-                  onClick={handleWorkSessionPause}
-                  className="ml-1 px-2 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded flex items-center gap-1"
-                >
-                  <Pause className="h-3 w-3" />
-                  Pause
-                </button>
-                <button
-                  onClick={handleWorkSessionStop}
-                  className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded flex items-center gap-1"
-                >
-                  <Square className="h-3 w-3" />
-                  Stop
-                </button>
-              </>
-            )}
-            {workSession.status === 'paused' && (
-              <>
-                <button
-                  onClick={handleWorkSessionStart}
-                  className="ml-1 px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1"
-                >
-                  <Play className="h-3 w-3" />
-                  Resume
-                </button>
-                <button
-                  onClick={handleWorkSessionStop}
-                  className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded flex items-center gap-1"
-                >
-                  <Square className="h-3 w-3" />
-                  Stop
-                </button>
-              </>
-            )}
           </div>
         </div>
       </div>
@@ -1077,13 +1026,13 @@ export function TrayView() {
 
         {/* Description Input */}
         <div className="mt-1">
-          <input
-            type="text"
+          <textarea
             placeholder="What are you working on?"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={timerState?.isRunning}
-            className="w-full px-3 py-2 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-muted-foreground/60"
+            rows={2}
+            className="w-full px-3 py-2 text-sm bg-background border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-muted-foreground/60 resize-none"
           />
         </div>
       </div>
