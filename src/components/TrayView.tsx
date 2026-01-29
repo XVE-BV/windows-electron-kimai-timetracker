@@ -3,10 +3,10 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, CheckCircle2, XCircle, RefreshCw, Coffee,
   Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket, Trash2,
-  Pause, Clock, AlertCircle, ScrollText, Download, RotateCcw
+  Pause, Clock, AlertCircle, ScrollText
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState, ActivitySummaryItem, UpdateStatus } from '../types';
+import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState, ActivitySummaryItem } from '../types';
 import { formatDuration as formatDurationUtil, formatDurationHuman } from '../utils';
 import { DATA_REFRESH_INTERVAL_MS, TIMER_UPDATE_INTERVAL_MS, MAX_RECENT_TIMESHEETS, MAX_ACTIVITY_SUMMARY_ITEMS, MAX_JIRA_ISSUES } from '../constants';
 
@@ -43,9 +43,6 @@ export function TrayView() {
 
   // Work session state
   const [workSession, setWorkSession] = useState<WorkSessionState>({ status: 'stopped', startedAt: null });
-
-  // Update state
-  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>({ status: 'idle' });
 
   // Error notification state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -242,19 +239,10 @@ export function TrayView() {
       loadData();
     });
 
-    // Listen for update status changes
-    const unsubscribeUpdate = window.electronAPI?.onUpdateStatus?.((status) => {
-      setUpdateStatus(status);
-    });
-
-    // Load initial update status
-    window.electronAPI?.updateGetStatus?.().then(setUpdateStatus);
-
     return () => {
       clearInterval(interval);
       clearInterval(dataInterval);
       unsubscribe?.();
-      unsubscribeUpdate?.();
       // Clean up error timeout
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
@@ -526,14 +514,6 @@ export function TrayView() {
 
   const openTimeEntry = () => {
     window.electronAPI?.openTimeEntry();
-  };
-
-  const handleDownloadUpdate = async () => {
-    await window.electronAPI?.updateDownload();
-  };
-
-  const handleInstallUpdate = () => {
-    window.electronAPI?.updateInstall();
   };
 
   const getProjectName = (projectId: number) => {
@@ -846,59 +826,6 @@ export function TrayView() {
             aria-label="Dismiss error"
           >
             <X className="h-3 w-3 text-red-500" />
-          </button>
-        </div>
-      )}
-
-      {/* Update Banner */}
-      {updateStatus.status === 'available' && updateStatus.info && (
-        <div className="px-3 py-2 bg-blue-500/10 border-b border-blue-500/30 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <Download className="h-4 w-4 text-blue-500 flex-shrink-0" />
-            <span className="text-xs text-blue-600">
-              Update available: v{updateStatus.info.version}
-            </span>
-          </div>
-          <button
-            onClick={handleDownloadUpdate}
-            className="px-2 py-1 text-xs bg-blue-500 hover:bg-blue-600 text-white rounded flex-shrink-0"
-          >
-            Download
-          </button>
-        </div>
-      )}
-
-      {updateStatus.status === 'downloading' && updateStatus.progress && (
-        <div className="px-3 py-2 bg-blue-500/10 border-b border-blue-500/30">
-          <div className="flex items-center gap-2 mb-1">
-            <RefreshCw className="h-4 w-4 text-blue-500 flex-shrink-0 animate-spin" />
-            <span className="text-xs text-blue-600">
-              Downloading update... {Math.round(updateStatus.progress.percent)}%
-            </span>
-          </div>
-          <div className="w-full bg-blue-200 rounded-full h-1">
-            <div
-              className="bg-blue-500 h-1 rounded-full transition-all"
-              style={{ width: `${updateStatus.progress.percent}%` }}
-            />
-          </div>
-        </div>
-      )}
-
-      {updateStatus.status === 'downloaded' && (
-        <div className="px-3 py-2 bg-green-500/10 border-b border-green-500/30 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2 min-w-0">
-            <CheckCircle2 className="h-4 w-4 text-green-500 flex-shrink-0" />
-            <span className="text-xs text-green-600">
-              Update ready to install
-            </span>
-          </div>
-          <button
-            onClick={handleInstallUpdate}
-            className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1 flex-shrink-0"
-          >
-            <RotateCcw className="h-3 w-3" />
-            Restart
           </button>
         </div>
       )}
