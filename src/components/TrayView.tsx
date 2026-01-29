@@ -1123,7 +1123,7 @@ export function TrayView() {
             {todayTimesheets.map((ts) => (
               <div key={ts.id} className="px-3 py-2 border-b border-border/50 last:border-0 flex items-center justify-between group">
                 <div className="flex-1 min-w-0">
-                  <div className="text-xs font-medium truncate">{getProjectName(ts.project)}</div>
+                  <div className="text-xs font-medium truncate">{ts.description || getProjectName(ts.project)}</div>
                   <div className="text-xs text-muted-foreground">
                     {formatTimesheetTime(ts.begin)}
                     {ts.end && ` - ${formatTimesheetTime(ts.end)}`}
