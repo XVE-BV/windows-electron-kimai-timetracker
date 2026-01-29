@@ -181,6 +181,29 @@ export interface WorkSessionState {
   startedAt: string | null;
 }
 
+// Update Status
+export interface UpdateProgressInfo {
+  total: number;
+  delta: number;
+  transferred: number;
+  percent: number;
+  bytesPerSecond: number;
+}
+
+export interface UpdateInfo {
+  version: string;
+  releaseDate: string;
+  releaseName?: string;
+  releaseNotes?: string;
+}
+
+export interface UpdateStatus {
+  status: 'idle' | 'checking' | 'available' | 'not-available' | 'downloading' | 'downloaded' | 'error';
+  info?: UpdateInfo;
+  progress?: UpdateProgressInfo;
+  error?: string;
+}
+
 // IPC Channel Names
 export const IPC_CHANNELS = {
   // Settings
@@ -227,6 +250,12 @@ export const IPC_CHANNELS = {
 
   // GitHub
   GITHUB_GET_RELEASES: 'github-get-releases',
+
+  // Updates
+  UPDATE_CHECK: 'update-check',
+  UPDATE_DOWNLOAD: 'update-download',
+  UPDATE_INSTALL: 'update-install',
+  UPDATE_GET_STATUS: 'update-get-status',
 } as const;
 
 // Default Settings

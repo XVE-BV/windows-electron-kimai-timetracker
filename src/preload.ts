@@ -13,6 +13,7 @@ import {
   AWEvent,
   JiraIssue,
   ActivitySummaryItem,
+  UpdateStatus,
 } from './types';
 
 // Expose protected methods that allow the renderer process to use
@@ -70,10 +71,21 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // GitHub
   githubGetReleases: () => ipcRenderer.invoke(IPC_CHANNELS.GITHUB_GET_RELEASES),
 
+  // Updates
+  updateCheck: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_CHECK),
+  updateDownload: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_DOWNLOAD),
+  updateInstall: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_INSTALL),
+  updateGetStatus: () => ipcRenderer.invoke(IPC_CHANNELS.UPDATE_GET_STATUS),
+
   // Events
   onSettingsChanged: (callback: () => void) => {
     ipcRenderer.on('settings-changed', callback);
     return () => ipcRenderer.removeListener('settings-changed', callback);
+  },
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => {
+    const handler = (_event: Electron.IpcRendererEvent, status: UpdateStatus) => callback(status);
+    ipcRenderer.on('update-status', handler);
+    return () => ipcRenderer.removeListener('update-status', handler);
   },
 });
 
@@ -115,7 +127,12 @@ export interface ElectronAPI {
     published_at: string;
     html_url: string;
   }>>;
+  updateCheck: () => Promise<UpdateStatus>;
+  updateDownload: () => Promise<void>;
+  updateInstall: () => Promise<void>;
+  updateGetStatus: () => Promise<UpdateStatus>;
   onSettingsChanged: (callback: () => void) => () => void;
+  onUpdateStatus: (callback: (status: UpdateStatus) => void) => () => void;
 }
 
 declare global {

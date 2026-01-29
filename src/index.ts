@@ -23,6 +23,7 @@ import {
 import { ValidationError, getUserMessage } from './errors';
 import { formatDurationCompact } from './utils';
 import { TRAY_WINDOW_WIDTH, TRAY_WINDOW_HEIGHT, WORK_SESSION_REMINDER_INTERVAL_MS } from './constants';
+import { updater } from './services/updater';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -702,6 +703,12 @@ function setupIPC(): void {
       request.end();
     });
   });
+
+  // Updates
+  ipcMain.handle(IPC_CHANNELS.UPDATE_CHECK, () => updater.checkForUpdates());
+  ipcMain.handle(IPC_CHANNELS.UPDATE_DOWNLOAD, () => updater.downloadUpdate());
+  ipcMain.handle(IPC_CHANNELS.UPDATE_INSTALL, () => updater.quitAndInstall());
+  ipcMain.handle(IPC_CHANNELS.UPDATE_GET_STATUS, () => updater.getStatus());
 }
 
 async function initializeApp(): Promise<void> {
@@ -750,6 +757,21 @@ async function initializeApp(): Promise<void> {
 
   // Create hidden main window (for renderer process)
   createMainWindow();
+
+  // Setup updater status broadcast
+  updater.setStatusCallback((status) => {
+    const windows = [trayWindow, settingsWindow, mainWindow].filter(
+      (w): w is BrowserWindow => w !== null && !w.isDestroyed()
+    );
+    windows.forEach(win => {
+      win.webContents.send('update-status', status);
+    });
+  });
+
+  // Check for updates on startup (after a short delay)
+  setTimeout(() => {
+    updater.checkForUpdates();
+  }, 5000);
 }
 
 // This method will be called when Electron has finished initialization
