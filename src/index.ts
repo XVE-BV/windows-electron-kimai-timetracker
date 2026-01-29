@@ -386,6 +386,7 @@ function createTrayWindow(): void {
     minimizable: true,
     maximizable: false,
     title: 'Kimai Time Tracker',
+    icon: createTrayIcon(),
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
@@ -469,6 +470,7 @@ function openSettingsWindow(): void {
     minimizable: false,
     maximizable: false,
     title: 'Settings',
+    icon: createTrayIcon(),
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
@@ -497,6 +499,7 @@ function openTimeEntryWindow(): void {
     minimizable: false,
     maximizable: false,
     title: 'Add Time Entry',
+    icon: createTrayIcon(),
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
