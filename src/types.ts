@@ -76,10 +76,69 @@ export interface AWSettings {
   enabled: boolean;
 }
 
+// Jira Types
+export interface JiraSettings {
+  apiUrl: string;      // e.g., https://your-domain.atlassian.net
+  email: string;       // Atlassian account email
+  apiToken: string;    // API token
+  enabled: boolean;
+}
+
+export interface JiraIssue {
+  id: string;
+  key: string;
+  self: string;
+  fields: {
+    summary: string;
+    status: {
+      name: string;
+      statusCategory: {
+        key: string;
+        name: string;
+      };
+    };
+    issuetype: {
+      name: string;
+      iconUrl?: string;
+    };
+    priority?: {
+      name: string;
+      iconUrl?: string;
+    };
+    assignee?: {
+      displayName: string;
+      emailAddress: string;
+    };
+    project: {
+      key: string;
+      name: string;
+    };
+    updated: string;
+    created: string;
+    // Custom field for customer (xve specific - customfield_10278)
+    customfield_10278?: {
+      value: string;
+      id: string;
+    };
+    // Allow other custom fields
+    [key: string]: unknown;
+  };
+}
+
+export interface JiraSearchResult {
+  issues: JiraIssue[];
+  isLast?: boolean;
+  // Legacy fields (may not be present in new /search/jql endpoint)
+  startAt?: number;
+  maxResults?: number;
+  total?: number;
+}
+
 // App Settings
 export interface AppSettings {
   kimai: KimaiSettings;
   activityWatch: AWSettings;
+  jira: JiraSettings;
   autoStartTimer: boolean;
   defaultCustomerId: number | null;
   defaultProjectId: number | null;
@@ -118,6 +177,11 @@ export const IPC_CHANNELS = {
   AW_GET_EVENTS: 'aw-get-events',
   AW_GET_ACTIVITY_SUMMARY: 'aw-get-activity-summary',
 
+  // Jira
+  JIRA_TEST_CONNECTION: 'jira-test-connection',
+  JIRA_GET_MY_ISSUES: 'jira-get-my-issues',
+  JIRA_SEARCH_ISSUES: 'jira-search-issues',
+
   // Timer
   GET_TIMER_STATE: 'get-timer-state',
 
@@ -136,6 +200,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   activityWatch: {
     apiUrl: 'http://localhost:5600',
     enabled: true,
+  },
+  jira: {
+    apiUrl: '',
+    email: '',
+    apiToken: '',
+    enabled: false,
   },
   autoStartTimer: false,
   defaultCustomerId: null,

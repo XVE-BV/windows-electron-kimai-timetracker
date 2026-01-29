@@ -1,11 +1,11 @@
-import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, CheckCircle2, XCircle, RefreshCw, Coffee,
-  Monitor, Layers, Briefcase, FileText, Search, X, Users
+  Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer } from '../types';
+import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings } from '../types';
 
 interface ActivitySummaryItem {
   app: string;
@@ -15,6 +15,7 @@ interface ActivitySummaryItem {
 
 export function TrayView() {
   const [timerState, setTimerState] = useState<TimerState | null>(null);
+  const timerStateRef = useRef<TimerState | null>(null);
   const [elapsedTime, setElapsedTime] = useState('00:00:00');
   const [projects, setProjects] = useState<KimaiProject[]>([]);
   const [allProjects, setAllProjects] = useState<KimaiProject[]>([]);
@@ -23,7 +24,7 @@ export function TrayView() {
   const [selectedProject, setSelectedProject] = useState<KimaiProject | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<KimaiActivity | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<KimaiCustomer | null>(null);
-  const [view, setView] = useState<'main' | 'customers' | 'projects' | 'activities'>('main');
+  const [view, setView] = useState<'main' | 'customers' | 'projects' | 'activities' | 'jira'>('main');
   const [todayTimesheets, setTodayTimesheets] = useState<KimaiTimesheet[]>([]);
   const [todayTotal, setTodayTotal] = useState(0);
   const [weekTotal, setWeekTotal] = useState(0);
@@ -32,6 +33,14 @@ export function TrayView() {
   const [awStatus, setAwStatus] = useState<'connected' | 'disconnected' | 'disabled'>('checking' as any);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [description, setDescription] = useState('');
+
+  // Jira state
+  const [jiraEnabled, setJiraEnabled] = useState(false);
+  const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([]);
+  const [selectedJiraIssue, setSelectedJiraIssue] = useState<JiraIssue | null>(null);
+  const [jiraStatus, setJiraStatus] = useState<'connected' | 'disconnected' | 'disabled'>('disabled');
+  const [jiraSearchQuery, setJiraSearchQuery] = useState('');
 
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
@@ -64,6 +73,11 @@ export function TrayView() {
       // Load timer state
       const state = await window.electronAPI.getTimerState() as TimerState;
       setTimerState(state);
+
+      // Load description from running timer
+      if (state.isRunning && state.description) {
+        setDescription(state.description);
+      }
 
       // Load customers
       const custs = await window.electronAPI.kimaiGetCustomers() as KimaiCustomer[];
@@ -132,8 +146,27 @@ export function TrayView() {
       setAwStatus('disconnected');
     }
 
+    // Load Jira issues if enabled
+    try {
+      const settings = await window.electronAPI.getSettings() as AppSettings;
+      if (settings.jira?.enabled) {
+        setJiraEnabled(true);
+        const issues = await window.electronAPI.jiraGetMyIssues(10) as JiraIssue[];
+        setJiraIssues(issues);
+        setJiraStatus('connected');
+      } else {
+        setJiraEnabled(false);
+        setJiraStatus('disabled');
+      }
+    } catch (error) {
+      console.error('Failed to load Jira issues:', error);
+      if (jiraEnabled) {
+        setJiraStatus('disconnected');
+      }
+    }
+
     setIsRefreshing(false);
-  }, []);
+  }, [jiraEnabled]);
 
   useEffect(() => {
     loadData();
@@ -145,17 +178,20 @@ export function TrayView() {
     };
   }, [loadData]);
 
+  // Keep ref in sync with state for interval access
   useEffect(() => {
+    timerStateRef.current = timerState;
     updateElapsedTime();
   }, [timerState]);
 
   const updateElapsedTime = () => {
-    if (!timerState?.isRunning || !timerState.startTime) {
+    const currentState = timerStateRef.current;
+    if (!currentState?.isRunning || !currentState.startTime) {
       setElapsedTime('00:00:00');
       return;
     }
 
-    const start = new Date(timerState.startTime);
+    const start = new Date(currentState.startTime);
     const now = new Date();
     const seconds = Math.floor((now.getTime() - start.getTime()) / 1000);
 
@@ -172,8 +208,10 @@ export function TrayView() {
     if (!window.electronAPI) return;
     if (timerState?.isRunning) {
       await window.electronAPI.kimaiStopTimer();
+      setDescription(''); // Clear description after stopping
+      setSelectedJiraIssue(null); // Clear Jira issue after stopping
     } else if (selectedProject && selectedActivity) {
-      await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, '');
+      await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
     }
     loadData();
   };
@@ -202,6 +240,90 @@ export function TrayView() {
     setSelectedActivity(activity);
     setSearchQuery('');
     setView('main');
+  };
+
+  const handleSelectJiraIssue = async (issue: JiraIssue) => {
+    setSelectedJiraIssue(issue);
+    // Prefill description if empty
+    if (!description) {
+      setDescription(`${issue.key}: ${issue.fields.summary}`);
+    }
+    setJiraSearchQuery('');
+
+    // Auto-select customer if none selected
+    if (!selectedCustomer && customers.length > 0) {
+      // Try to match customfield_10278 (customer field) first
+      const jiraCustomerName = (issue.fields.customfield_10278 as { value?: string } | undefined)?.value;
+      const jiraProjectName = issue.fields.project?.name;
+
+      let matchedCustomer: KimaiCustomer | undefined;
+
+      // Helper to find best matching customer (prefers longer names for more specific matches)
+      const findBestMatch = (searchTerm: string): KimaiCustomer | undefined => {
+        const term = searchTerm.toLowerCase();
+        // First try exact match
+        const exact = customers.find(c => c.name.toLowerCase() === term);
+        if (exact) return exact;
+
+        // Find all partial matches and pick the longest (most specific)
+        const partialMatches = customers.filter(c =>
+          c.name.toLowerCase().includes(term) || term.includes(c.name.toLowerCase())
+        );
+        if (partialMatches.length > 0) {
+          // Sort by name length descending, pick longest
+          return partialMatches.sort((a, b) => b.name.length - a.name.length)[0];
+        }
+        return undefined;
+      };
+
+      // First try to match customfield_10278 (customer field)
+      if (jiraCustomerName) {
+        matchedCustomer = findBestMatch(jiraCustomerName);
+      }
+
+      // Fallback to project name
+      if (!matchedCustomer && jiraProjectName) {
+        matchedCustomer = findBestMatch(jiraProjectName);
+      }
+
+      // Auto-select the matched customer, project, and activity
+      if (matchedCustomer) {
+        setSelectedCustomer(matchedCustomer);
+        const filteredProjects = allProjects.filter(p => p.customer === matchedCustomer.id);
+        setProjects(filteredProjects);
+
+        // Auto-select project matching "regiewerk"
+        const matchedProject = filteredProjects.find(p =>
+          p.name.toLowerCase().includes('regiewerk')
+        );
+        if (matchedProject) {
+          setSelectedProject(matchedProject);
+
+          // Load activities for this project and auto-select one matching "werk"
+          if (window.electronAPI) {
+            try {
+              const acts = await window.electronAPI.kimaiGetActivities(matchedProject.id) as KimaiActivity[];
+              setActivities(acts);
+
+              const matchedActivity = acts.find(a =>
+                a.name.toLowerCase().includes('werk')
+              );
+              if (matchedActivity) {
+                setSelectedActivity(matchedActivity);
+              }
+            } catch (error) {
+              console.error('Failed to load activities:', error);
+            }
+          }
+        }
+      }
+    }
+
+    setView('main');
+  };
+
+  const clearJiraIssue = () => {
+    setSelectedJiraIssue(null);
   };
 
   const openSettings = () => {
@@ -241,6 +363,15 @@ export function TrayView() {
     const query = searchQuery.toLowerCase();
     return activities.filter(a => a.name.toLowerCase().includes(query));
   }, [activities, searchQuery]);
+
+  const filteredJiraIssues = useMemo(() => {
+    if (!jiraSearchQuery) return jiraIssues;
+    const query = jiraSearchQuery.toLowerCase();
+    return jiraIssues.filter(issue =>
+      issue.key.toLowerCase().includes(query) ||
+      issue.fields.summary.toLowerCase().includes(query)
+    );
+  }, [jiraIssues, jiraSearchQuery]);
 
   // Customers list view with search
   if (view === 'customers') {
@@ -425,6 +556,73 @@ export function TrayView() {
     );
   }
 
+  // Jira issues list view with search
+  if (view === 'jira') {
+    return (
+      <div className="w-full bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
+        <div className="p-3 border-b border-border bg-muted/30">
+          <button
+            onClick={() => { setView('main'); setJiraSearchQuery(''); }}
+            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+          >
+            ← Back
+          </button>
+          <h3 className="font-semibold mt-1">Select Jira Ticket</h3>
+          <p className="text-xs text-muted-foreground">Your assigned issues</p>
+        </div>
+        {/* Search Input */}
+        <div className="p-2 border-b border-border">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <input
+              type="text"
+              placeholder="Search tickets..."
+              value={jiraSearchQuery}
+              onChange={(e) => setJiraSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-8 py-2 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50"
+              autoFocus
+            />
+            {jiraSearchQuery && (
+              <button
+                onClick={() => setJiraSearchQuery('')}
+                className="absolute right-2 top-1/2 -translate-y-1/2 p-1 hover:bg-muted rounded"
+              >
+                <X className="h-3 w-3 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        </div>
+        <div className="max-h-80 overflow-y-auto">
+          {filteredJiraIssues.map((issue) => (
+            <button
+              key={issue.id}
+              onClick={() => handleSelectJiraIssue(issue)}
+              className={`w-full px-4 py-3 text-left hover:bg-accent border-b border-border/50 last:border-0 ${selectedJiraIssue?.id === issue.id ? 'bg-accent' : ''}`}
+            >
+              <div className="flex items-center gap-2">
+                <Ticket className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-mono font-medium text-blue-600">{issue.key}</span>
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                      {issue.fields.status.name}
+                    </span>
+                  </div>
+                  <div className="text-sm truncate mt-0.5">{issue.fields.summary}</div>
+                </div>
+              </div>
+            </button>
+          ))}
+          {filteredJiraIssues.length === 0 && (
+            <div className="p-4 text-center text-muted-foreground text-sm">
+              {jiraSearchQuery ? 'No matching tickets' : 'No assigned tickets'}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   // Main view - comprehensive
   return (
     <div className="w-full bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
@@ -554,6 +752,54 @@ export function TrayView() {
           </div>
           <ChevronRight className="h-4 w-4 text-muted-foreground" />
         </button>
+
+        {/* Jira Ticket Selection */}
+        {jiraEnabled && (
+          <div className="mt-1">
+            {selectedJiraIssue ? (
+              <div className="px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-md flex items-center justify-between">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <Ticket className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                  <div className="min-w-0 flex-1">
+                    <span className="text-xs font-mono font-medium text-blue-600">{selectedJiraIssue.key}</span>
+                    <span className="text-xs text-muted-foreground ml-2 truncate">{selectedJiraIssue.fields.summary}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={clearJiraIssue}
+                  disabled={timerState?.isRunning}
+                  className="p-1 hover:bg-muted rounded disabled:opacity-50"
+                >
+                  <X className="h-3 w-3 text-muted-foreground" />
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setView('jira')}
+                disabled={timerState?.isRunning}
+                className="w-full px-3 py-2 text-left bg-muted/50 hover:bg-muted rounded-md flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-center gap-2">
+                  <Ticket className="h-4 w-4 text-blue-500" />
+                  <span className="text-sm text-muted-foreground">Link Jira ticket...</span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+              </button>
+            )}
+          </div>
+        )}
+
+        {/* Description Input */}
+        <div className="mt-1">
+          <input
+            type="text"
+            placeholder="What are you working on?"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={timerState?.isRunning}
+            className="w-full px-3 py-2 text-sm bg-muted/50 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 disabled:opacity-50 disabled:cursor-not-allowed placeholder:text-muted-foreground/60"
+          />
+        </div>
       </div>
 
       {/* Start/Stop Button */}
@@ -663,8 +909,20 @@ export function TrayView() {
           ) : (
             <XCircle className="h-3 w-3 text-red-500" />
           )}
-          <span>ActivityWatch</span>
+          <span>AW</span>
         </div>
+        {jiraEnabled && (
+          <div className="flex items-center gap-1">
+            {jiraStatus === 'connected' ? (
+              <CheckCircle2 className="h-3 w-3 text-blue-500" />
+            ) : jiraStatus === 'disabled' ? (
+              <Coffee className="h-3 w-3 text-gray-400" />
+            ) : (
+              <XCircle className="h-3 w-3 text-red-500" />
+            )}
+            <span>Jira</span>
+          </div>
+        )}
       </div>
     </div>
   );

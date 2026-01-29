@@ -2,6 +2,7 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, scr
 import * as path from 'path';
 import { kimaiAPI } from './services/kimai';
 import { activityWatchAPI } from './services/activitywatch';
+import { jiraAPI } from './services/jira';
 import {
   getSettings,
   saveSettings,
@@ -493,6 +494,13 @@ function setupIPC(): void {
   );
   ipcMain.handle(IPC_CHANNELS.AW_GET_ACTIVITY_SUMMARY, (_, minutes?: number) =>
     activityWatchAPI.getRecentActivity(minutes)
+  );
+
+  // Jira
+  ipcMain.handle(IPC_CHANNELS.JIRA_TEST_CONNECTION, () => jiraAPI.testConnection());
+  ipcMain.handle(IPC_CHANNELS.JIRA_GET_MY_ISSUES, (_, maxResults?: number) => jiraAPI.getMyIssues(maxResults));
+  ipcMain.handle(IPC_CHANNELS.JIRA_SEARCH_ISSUES, (_, jql: string, maxResults?: number) =>
+    jiraAPI.searchIssues(jql, maxResults)
   );
 
   // Timer State

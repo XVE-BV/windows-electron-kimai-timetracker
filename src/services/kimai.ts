@@ -147,7 +147,27 @@ class KimaiAPI {
   }
 
   async stopTimer(timesheetId: number): Promise<KimaiTimesheet> {
-    return this.stopTimesheet(timesheetId);
+    // Stop the timer first
+    const stoppedTimesheet = await this.stopTimesheet(timesheetId);
+
+    // Enforce minimum 15 minute duration
+    const minDurationSeconds = 15 * 60; // 15 minutes
+    if (stoppedTimesheet.duration < minDurationSeconds) {
+      // Calculate new end time: begin + 15 minutes
+      const beginDate = new Date(stoppedTimesheet.begin);
+      const newEndDate = new Date(beginDate.getTime() + minDurationSeconds * 1000);
+
+      // Update the timesheet with new end time
+      return this.updateTimesheet(timesheetId, {
+        end: this.formatDateTime(newEndDate),
+      });
+    }
+
+    return stoppedTimesheet;
+  }
+
+  async updateTimesheet(id: number, data: Partial<KimaiTimesheetCreate> & { end?: string }): Promise<KimaiTimesheet> {
+    return this.request<KimaiTimesheet>('PATCH', `/timesheets/${id}`, data);
   }
 
   private formatDateTime(date: Date): string {

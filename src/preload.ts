@@ -27,6 +27,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke(IPC_CHANNELS.AW_GET_EVENTS, bucketId, start, end, limit),
   awGetActivitySummary: (minutes?: number) => ipcRenderer.invoke(IPC_CHANNELS.AW_GET_ACTIVITY_SUMMARY, minutes),
 
+  // Jira
+  jiraTestConnection: () => ipcRenderer.invoke(IPC_CHANNELS.JIRA_TEST_CONNECTION),
+  jiraGetMyIssues: (maxResults?: number) => ipcRenderer.invoke(IPC_CHANNELS.JIRA_GET_MY_ISSUES, maxResults),
+  jiraSearchIssues: (jql: string, maxResults?: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.JIRA_SEARCH_ISSUES, jql, maxResults),
+
   // Timer State
   getTimerState: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TIMER_STATE),
 
@@ -51,6 +57,9 @@ export interface ElectronAPI {
   awGetBuckets: () => Promise<unknown>;
   awGetEvents: (bucketId: string, start?: string, end?: string, limit?: number) => Promise<unknown[]>;
   awGetActivitySummary: (minutes?: number) => Promise<unknown[]>;
+  jiraTestConnection: () => Promise<{ success: boolean; message: string }>;
+  jiraGetMyIssues: (maxResults?: number) => Promise<unknown[]>;
+  jiraSearchIssues: (jql: string, maxResults?: number) => Promise<unknown[]>;
   getTimerState: () => Promise<unknown>;
   openSettings: () => Promise<void>;
   openTimeEntry: () => Promise<void>;

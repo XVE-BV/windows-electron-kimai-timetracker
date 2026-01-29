@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Link, Activity, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { Settings, Link, Activity, CheckCircle, XCircle, Loader2, Ticket } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -25,6 +25,14 @@ export function SettingsView() {
   const [awStatus, setAwStatus] = useState<ConnectionStatus>('idle');
   const [awMessage, setAwMessage] = useState('');
 
+  // Jira state
+  const [jiraEnabled, setJiraEnabled] = useState(false);
+  const [jiraUrl, setJiraUrl] = useState('');
+  const [jiraEmail, setJiraEmail] = useState('');
+  const [jiraToken, setJiraToken] = useState('');
+  const [jiraStatus, setJiraStatus] = useState<ConnectionStatus>('idle');
+  const [jiraMessage, setJiraMessage] = useState('');
+
   const [customers, setCustomers] = useState<KimaiCustomer[]>([]);
   const [projects, setProjects] = useState<KimaiProject[]>([]);
   const [activities, setActivities] = useState<KimaiActivity[]>([]);
@@ -47,6 +55,10 @@ export function SettingsView() {
       setKimaiToken(s.kimai.apiToken);
       setAwEnabled(s.activityWatch.enabled);
       setAwUrl(s.activityWatch.apiUrl);
+      setJiraEnabled(s.jira?.enabled || false);
+      setJiraUrl(s.jira?.apiUrl || '');
+      setJiraEmail(s.jira?.email || '');
+      setJiraToken(s.jira?.apiToken || '');
       setDefaultCustomer(s.defaultCustomerId?.toString() || 'none');
       setDefaultProject(s.defaultProjectId?.toString() || 'none');
       setDefaultActivity(s.defaultActivityId?.toString() || 'none');
@@ -106,6 +118,7 @@ export function SettingsView() {
     const tempSettings: AppSettings = {
       ...settings!,
       kimai: { apiUrl: kimaiUrl, apiToken: kimaiToken },
+      jira: settings?.jira || { apiUrl: '', email: '', apiToken: '', enabled: false },
     };
     await window.electronAPI.saveSettings(tempSettings);
 
@@ -133,6 +146,7 @@ export function SettingsView() {
     const tempSettings: AppSettings = {
       ...settings!,
       activityWatch: { apiUrl: awUrl, enabled: awEnabled },
+      jira: settings?.jira || { apiUrl: '', email: '', apiToken: '', enabled: false },
     };
     await window.electronAPI.saveSettings(tempSettings);
 
@@ -147,6 +161,32 @@ export function SettingsView() {
     }
   };
 
+  const testJiraConnection = async () => {
+    if (!window.electronAPI) return;
+    setJiraStatus('loading');
+    setJiraMessage('');
+
+    const tempSettings: AppSettings = {
+      ...settings!,
+      jira: { apiUrl: jiraUrl, email: jiraEmail, apiToken: jiraToken, enabled: jiraEnabled },
+    };
+    await window.electronAPI.saveSettings(tempSettings);
+
+    try {
+      const result = await window.electronAPI.jiraTestConnection();
+      if (result.success) {
+        setJiraStatus('success');
+        setJiraMessage(result.message);
+      } else {
+        setJiraStatus('error');
+        setJiraMessage(result.message);
+      }
+    } catch (error) {
+      setJiraStatus('error');
+      setJiraMessage('Connection failed');
+    }
+  };
+
   const saveSettings = async () => {
     if (!settings || !window.electronAPI) return;
 
@@ -158,6 +198,12 @@ export function SettingsView() {
       activityWatch: {
         apiUrl: awUrl.replace(/\/$/, ''),
         enabled: awEnabled,
+      },
+      jira: {
+        apiUrl: jiraUrl.replace(/\/$/, ''),
+        email: jiraEmail,
+        apiToken: jiraToken,
+        enabled: jiraEnabled,
       },
       autoStartTimer: settings.autoStartTimer,
       defaultCustomerId: defaultCustomer && defaultCustomer !== 'none' ? parseInt(defaultCustomer) : null,
@@ -296,6 +342,81 @@ export function SettingsView() {
               {awMessage && (
                 <span className={`text-sm ${awStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
                   {awMessage}
+                </span>
+              )}
+            </div>
+          </CardContent>
+        )}
+      </Card>
+
+      {/* Jira Cloud */}
+      <Card>
+        <CardHeader className="pb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Ticket className="h-5 w-5 text-primary" />
+              <CardTitle className="text-lg">Jira Cloud</CardTitle>
+            </div>
+            <Switch checked={jiraEnabled} onCheckedChange={setJiraEnabled} />
+          </div>
+          <CardDescription>Connect to Jira Cloud for ticket suggestions</CardDescription>
+        </CardHeader>
+        {jiraEnabled && (
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="jira-url">Jira Cloud URL</Label>
+              <Input
+                id="jira-url"
+                type="url"
+                placeholder="https://your-domain.atlassian.net"
+                value={jiraUrl}
+                onChange={(e) => setJiraUrl(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Your Atlassian Cloud URL</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="jira-email">Email</Label>
+              <Input
+                id="jira-email"
+                type="email"
+                placeholder="you@example.com"
+                value={jiraEmail}
+                onChange={(e) => setJiraEmail(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">Your Atlassian account email</p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="jira-token">API Token</Label>
+              <Input
+                id="jira-token"
+                type="password"
+                placeholder="Your API token"
+                value={jiraToken}
+                onChange={(e) => setJiraToken(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                Generate at{' '}
+                <a
+                  href="https://id.atlassian.com/manage-profile/security/api-tokens"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-primary hover:underline"
+                >
+                  Atlassian API Tokens
+                </a>
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              <Button variant="secondary" size="sm" onClick={testJiraConnection}>
+                Test Connection
+              </Button>
+              <StatusIcon status={jiraStatus} />
+              {jiraMessage && (
+                <span className={`text-sm ${jiraStatus === 'success' ? 'text-green-600' : 'text-red-600'}`}>
+                  {jiraMessage}
                 </span>
               )}
             </div>
