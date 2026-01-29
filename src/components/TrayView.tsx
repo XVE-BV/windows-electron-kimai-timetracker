@@ -922,14 +922,17 @@ export function TrayView() {
             <Monitor className="h-3 w-3 text-muted-foreground" />
             <span className="text-xs font-medium text-muted-foreground">Activity (Last Hour)</span>
           </div>
-          <div className="px-3 py-2 space-y-1.5">
+          <div className="px-3 py-2 space-y-2">
             {activitySummary.map((item, i) => (
-              <div key={i} className="flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Zap className="h-3 w-3 text-blue-500 flex-shrink-0" />
-                  <span className="text-xs truncate">{item.app}</span>
+              <div key={i} className="flex items-start justify-between gap-2">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
+                  <Zap className="h-3 w-3 text-blue-500 flex-shrink-0 mt-0.5" />
+                  <div className="min-w-0 flex-1">
+                    <div className="text-xs font-medium truncate">{item.title || item.app}</div>
+                    <div className="text-[10px] text-muted-foreground truncate">{item.app}</div>
+                  </div>
                 </div>
-                <span className="text-xs font-mono text-muted-foreground ml-2">
+                <span className="text-xs font-mono text-muted-foreground flex-shrink-0">
                   {formatDuration(item.duration)}
                 </span>
               </div>
