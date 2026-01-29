@@ -13,7 +13,7 @@ export const TIME_ENTRY_WINDOW_HEIGHT = 500;
 // Intervals
 export const TIMER_UPDATE_INTERVAL_MS = 1000;
 export const DATA_REFRESH_INTERVAL_MS = 60000;
-export const WORK_SESSION_REMINDER_INTERVAL_MS = 60000;
+export const REMINDER_INTERVAL_MS = 30000;
 
 // Network
 export const REQUEST_TIMEOUT_MS = 30000;
