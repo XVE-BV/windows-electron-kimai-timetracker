@@ -3,7 +3,7 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, CheckCircle2, XCircle, RefreshCw, Coffee,
   Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket, Trash2,
-  Pause, Clock, AlertCircle, ScrollText, Bell, BellOff
+  Pause, Clock, AlertCircle, ScrollText, Bell, BellOff, Bug
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState, ActivitySummaryItem } from '../types';
@@ -1148,6 +1148,13 @@ export function TrayView() {
           title="Changelog"
         >
           <ScrollText className="h-3 w-3" />
+        </button>
+        <button
+          onClick={() => window.electronAPI?.openDebug()}
+          className="px-2 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center justify-center"
+          title="Debug"
+        >
+          <Bug className="h-3 w-3" />
         </button>
       </div>
 

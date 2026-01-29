@@ -71,6 +71,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // GitHub
   githubGetReleases: () => ipcRenderer.invoke(IPC_CHANNELS.GITHUB_GET_RELEASES),
 
+  // Debug
+  debugGetProcesses: () => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_GET_PROCESSES),
+  debugKillProcess: (pid: number) => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_KILL_PROCESS, pid),
+  debugGetLogs: () => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_GET_LOGS),
+  debugClearLogs: () => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_CLEAR_LOGS),
+  openDebug: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_DEBUG),
+
   // Events
   onSettingsChanged: (callback: () => void) => {
     ipcRenderer.on('settings-changed', callback);
@@ -117,6 +124,20 @@ export interface ElectronAPI {
     published_at: string;
     html_url: string;
   }>>;
+  debugGetProcesses: () => Promise<Array<{
+    pid: number;
+    name: string;
+    memory: number;
+    isCurrent: boolean;
+  }>>;
+  debugKillProcess: (pid: number) => Promise<{ success: boolean; message?: string }>;
+  debugGetLogs: () => Promise<Array<{
+    timestamp: string;
+    level: 'info' | 'warn' | 'error';
+    message: string;
+  }>>;
+  debugClearLogs: () => Promise<{ success: boolean }>;
+  openDebug: () => Promise<void>;
   onSettingsChanged: (callback: () => void) => () => void;
 }
 

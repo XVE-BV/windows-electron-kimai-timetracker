@@ -39,6 +39,28 @@ let trayWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let timeEntryWindow: BrowserWindow | null = null;
 let changelogWindow: BrowserWindow | null = null;
+let debugWindow: BrowserWindow | null = null;
+
+// Debug log buffer
+interface LogEntry {
+  timestamp: string;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+}
+const logBuffer: LogEntry[] = [];
+const MAX_LOG_ENTRIES = 500;
+
+function addLog(level: 'info' | 'warn' | 'error', message: string): void {
+  const entry: LogEntry = {
+    timestamp: new Date().toISOString().replace('T', ' ').substring(0, 19),
+    level,
+    message,
+  };
+  logBuffer.push(entry);
+  if (logBuffer.length > MAX_LOG_ENTRIES) {
+    logBuffer.shift();
+  }
+}
 
 // Cache for projects and activities
 let cachedProjects: KimaiProject[] = [];
@@ -520,6 +542,35 @@ function openChangelogWindow(): void {
   });
 }
 
+function openDebugWindow(): void {
+  if (debugWindow && !debugWindow.isDestroyed()) {
+    debugWindow.focus();
+    return;
+  }
+
+  debugWindow = new BrowserWindow({
+    width: 500,
+    height: 600,
+    resizable: true,
+    minimizable: true,
+    maximizable: false,
+    title: 'Debug',
+    icon: createTrayIcon(),
+    webPreferences: {
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  debugWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#debug`);
+  debugWindow.setMenu(null);
+
+  debugWindow.on('closed', () => {
+    debugWindow = null;
+  });
+}
+
 async function openActivitySummary(): Promise<void> {
   const settings = getSettings();
   if (!settings.activityWatch.enabled) {
@@ -667,6 +718,87 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.CLOSE_WINDOW, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.close();
+  });
+
+  // Debug
+  ipcMain.handle(IPC_CHANNELS.DEBUG_GET_PROCESSES, async () => {
+    const { exec } = require('child_process');
+    const currentPid = process.pid;
+
+    return new Promise((resolve) => {
+      // Use PowerShell to find all Kimai Time Tracker processes
+      const cmd = `powershell -Command "Get-Process | Where-Object {$_.ProcessName -match 'kimai|electron'} | Select-Object Id,ProcessName,WorkingSet64 | ConvertTo-Json"`;
+
+      exec(cmd, (error: Error | null, stdout: string) => {
+        if (error) {
+          addLog('error', `Failed to get processes: ${error.message}`);
+          resolve([]);
+          return;
+        }
+
+        try {
+          let processes = JSON.parse(stdout || '[]');
+          // Handle single process (not array)
+          if (!Array.isArray(processes)) {
+            processes = [processes];
+          }
+
+          const result = processes
+            .filter((p: { ProcessName: string }) =>
+              p.ProcessName?.toLowerCase().includes('kimai') ||
+              p.ProcessName?.toLowerCase() === 'electron'
+            )
+            .map((p: { Id: number; ProcessName: string; WorkingSet64: number }) => ({
+              pid: p.Id,
+              name: p.ProcessName,
+              memory: p.WorkingSet64 || 0,
+              isCurrent: p.Id === currentPid,
+            }));
+
+          resolve(result);
+        } catch (parseError) {
+          addLog('error', `Failed to parse process list: ${parseError}`);
+          resolve([]);
+        }
+      });
+    });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.DEBUG_KILL_PROCESS, async (_, pid: number) => {
+    const { exec } = require('child_process');
+    const currentPid = process.pid;
+
+    if (pid === currentPid) {
+      addLog('warn', 'Attempted to kill current process - ignored');
+      return { success: false, message: 'Cannot kill current process' };
+    }
+
+    return new Promise((resolve) => {
+      exec(`taskkill /PID ${pid} /F`, (error: Error | null) => {
+        if (error) {
+          addLog('error', `Failed to kill PID ${pid}: ${error.message}`);
+          resolve({ success: false, message: error.message });
+        } else {
+          addLog('info', `Killed process PID ${pid}`);
+          resolve({ success: true });
+        }
+      });
+    });
+  });
+
+  ipcMain.handle(IPC_CHANNELS.DEBUG_GET_LOGS, () => {
+    return logBuffer;
+  });
+
+  ipcMain.handle(IPC_CHANNELS.DEBUG_CLEAR_LOGS, () => {
+    logBuffer.length = 0;
+    addLog('info', 'Logs cleared');
+    return { success: true };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.OPEN_DEBUG, () => {
+    if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
+    openDebugWindow();
   });
 
   // GitHub

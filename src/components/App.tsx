@@ -4,9 +4,10 @@ import { TimeEntryView } from './TimeEntryView';
 import { MainView } from './MainView';
 import { TrayView } from './TrayView';
 import { ChangelogView } from './ChangelogView';
+import { DebugView } from './DebugView';
 import { ErrorBoundary } from './ErrorBoundary';
 
-type View = 'main' | 'settings' | 'time-entry' | 'tray' | 'changelog';
+type View = 'main' | 'settings' | 'time-entry' | 'tray' | 'changelog' | 'debug';
 
 export function App() {
   const [view, setView] = useState<View>('main');
@@ -22,6 +23,8 @@ export function App() {
         setView('tray');
       } else if (hash === '#changelog') {
         setView('changelog');
+      } else if (hash === '#debug') {
+        setView('debug');
       } else {
         setView('main');
       }
@@ -39,6 +42,7 @@ export function App() {
         {view === 'time-entry' && <TimeEntryView />}
         {view === 'tray' && <TrayView />}
         {view === 'changelog' && <ChangelogView />}
+        {view === 'debug' && <DebugView />}
         {view === 'main' && <MainView />}
       </div>
     </ErrorBoundary>

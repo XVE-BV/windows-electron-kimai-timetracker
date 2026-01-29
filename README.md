@@ -43,18 +43,47 @@ On Ubuntu/GNOME, you may need the [AppIndicator extension](https://extensions.gn
 2. Click **Settings**
 3. Configure your connections:
 
-### Kimai
-- **API URL**: Your Kimai instance URL (e.g., `https://kimai.example.com`)
-- **API Token**: Generate from Kimai → Settings → API
+### Kimai Setup
 
-### ActivityWatch (Optional)
-- **API URL**: Default `http://localhost:5600`
-- Enable to see activity summaries
+1. Log in to your Kimai instance
+2. Go to **Settings** (gear icon) → **API**
+3. Click **Create** to generate a new API token
+4. Copy the token (you won't see it again)
 
-### Jira (Optional)
+**In the app:**
+- **API URL**: Your Kimai URL with `/api` (e.g., `https://kimai.example.com`)
+- **API Token**: Paste your token
+
+### ActivityWatch Setup (Optional)
+
+[ActivityWatch](https://activitywatch.net/) tracks your computer activity locally.
+
+1. Download and install ActivityWatch from https://activitywatch.net/
+2. Start ActivityWatch (runs in system tray)
+
+**In the app:**
+- **API URL**: `http://localhost:5600` (default)
+- Enable the toggle to see activity summaries
+
+### Jira Setup (Optional)
+
+**Step 1: Create an API Token**
+
+1. Go to https://id.atlassian.com/manage-profile/security/api-tokens
+2. Click **Create API token**
+3. Give it a label (e.g., "Kimai Time Tracker")
+4. Click **Create** and copy the token
+
+**Step 2: Find your Jira URL**
+
+Your Jira URL is typically `https://yourcompany.atlassian.net`
+
+**In the app:**
 - **API URL**: Your Atlassian URL (e.g., `https://company.atlassian.net`)
-- **Email**: Your Atlassian account email
-- **API Token**: Generate from [Atlassian Account Settings](https://id.atlassian.com/manage-profile/security/api-tokens)
+- **Email**: Your Atlassian account email (the one you log in with)
+- **API Token**: Paste the token you created
+
+**Note:** The API token uses Basic Authentication. No special scopes or permissions are needed beyond your normal Jira access.
 
 ## Development
 

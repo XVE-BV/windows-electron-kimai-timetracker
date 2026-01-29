@@ -229,6 +229,13 @@ export const IPC_CHANNELS = {
 
   // GitHub
   GITHUB_GET_RELEASES: 'github-get-releases',
+
+  // Debug
+  DEBUG_GET_PROCESSES: 'debug-get-processes',
+  DEBUG_KILL_PROCESS: 'debug-kill-process',
+  DEBUG_GET_LOGS: 'debug-get-logs',
+  DEBUG_CLEAR_LOGS: 'debug-clear-logs',
+  OPEN_DEBUG: 'open-debug',
 } as const;
 
 // Default Settings
