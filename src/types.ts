@@ -164,6 +164,14 @@ export interface TimerState {
   description: string;
 }
 
+// Work Session State
+export type WorkSessionStatus = 'stopped' | 'active' | 'paused';
+
+export interface WorkSessionState {
+  status: WorkSessionStatus;
+  startedAt: string | null;
+}
+
 // IPC Channel Names
 export const IPC_CHANNELS = {
   // Settings
@@ -194,6 +202,12 @@ export const IPC_CHANNELS = {
 
   // Timer
   GET_TIMER_STATE: 'get-timer-state',
+
+  // Work Session
+  WORK_SESSION_START: 'work-session-start',
+  WORK_SESSION_PAUSE: 'work-session-pause',
+  WORK_SESSION_STOP: 'work-session-stop',
+  WORK_SESSION_GET_STATE: 'work-session-get-state',
 
   // Window
   OPEN_SETTINGS: 'open-settings',

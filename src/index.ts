@@ -9,7 +9,7 @@ import {
   getTimerState,
   updateTimerState,
 } from './services/store';
-import { IPC_CHANNELS, AppSettings, KimaiProject, KimaiActivity } from './types';
+import { IPC_CHANNELS, AppSettings, KimaiProject, KimaiActivity, WorkSessionState } from './types';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -31,6 +31,16 @@ let cachedActivities: KimaiActivity[] = [];
 
 // Timer update interval
 let timerUpdateInterval: NodeJS.Timeout | null = null;
+
+// Work session state
+let workSessionState: WorkSessionState = {
+  status: 'stopped',
+  startedAt: null,
+};
+
+// Work session reminder interval (check every minute)
+let workSessionReminderInterval: NodeJS.Timeout | null = null;
+const REMINDER_INTERVAL_MS = 60 * 1000; // 1 minute
 
 // Tray window dimensions
 const TRAY_WINDOW_WIDTH = 380;
@@ -282,6 +292,68 @@ function stopTimerUpdateLoop(): void {
   }
 }
 
+// Work Session Functions
+function startWorkSession(): WorkSessionState {
+  workSessionState = {
+    status: 'active',
+    startedAt: new Date().toISOString(),
+  };
+  startWorkSessionReminder();
+  return workSessionState;
+}
+
+function pauseWorkSession(): WorkSessionState {
+  workSessionState = {
+    ...workSessionState,
+    status: 'paused',
+  };
+  stopWorkSessionReminder();
+  return workSessionState;
+}
+
+function stopWorkSession(): WorkSessionState {
+  workSessionState = {
+    status: 'stopped',
+    startedAt: null,
+  };
+  stopWorkSessionReminder();
+  return workSessionState;
+}
+
+function getWorkSessionState(): WorkSessionState {
+  return workSessionState;
+}
+
+function startWorkSessionReminder(): void {
+  stopWorkSessionReminder(); // Clear any existing interval
+
+  // Check immediately
+  checkAndRemind();
+
+  // Then check every minute
+  workSessionReminderInterval = setInterval(checkAndRemind, REMINDER_INTERVAL_MS);
+}
+
+function stopWorkSessionReminder(): void {
+  if (workSessionReminderInterval) {
+    clearInterval(workSessionReminderInterval);
+    workSessionReminderInterval = null;
+  }
+}
+
+function checkAndRemind(): void {
+  // Only remind if work session is active (not paused or stopped)
+  if (workSessionState.status !== 'active') {
+    return;
+  }
+
+  // Check if Kimai timer is running
+  const timerState = getTimerState();
+  if (!timerState.isRunning) {
+    showNotification('Time Tracking Reminder', 'You are not tracking time! Start a timer or pause your work session.');
+  }
+}
+
 function showNotification(title: string, body: string): void {
   if (Notification.isSupported()) {
     new Notification({ title, body }).show();
@@ -521,6 +593,12 @@ function setupIPC(): void {
 
   // Timer State
   ipcMain.handle(IPC_CHANNELS.GET_TIMER_STATE, () => getTimerState());
+
+  // Work Session
+  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_START, () => startWorkSession());
+  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_PAUSE, () => pauseWorkSession());
+  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_STOP, () => stopWorkSession());
+  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_GET_STATE, () => getWorkSessionState());
 
   // Window
   ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, () => {

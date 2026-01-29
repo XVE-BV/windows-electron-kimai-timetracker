@@ -2,10 +2,11 @@ import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, CheckCircle2, XCircle, RefreshCw, Coffee,
-  Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket, Trash2
+  Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket, Trash2,
+  Pause, Clock
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings } from '../types';
+import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState } from '../types';
 
 interface ActivitySummaryItem {
   app: string;
@@ -42,6 +43,9 @@ export function TrayView() {
   const [jiraStatus, setJiraStatus] = useState<'connected' | 'disconnected' | 'disabled'>('disabled');
   const [jiraSearchQuery, setJiraSearchQuery] = useState('');
 
+  // Work session state
+  const [workSession, setWorkSession] = useState<WorkSessionState>({ status: 'stopped', startedAt: null });
+
   const formatDuration = (seconds: number): string => {
     const hours = Math.floor(seconds / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
@@ -70,6 +74,10 @@ export function TrayView() {
     if (!window.electronAPI) return;
     setIsRefreshing(true);
     try {
+      // Load work session state
+      const sessionState = await window.electronAPI.workSessionGetState();
+      setWorkSession(sessionState);
+
       // Load timer state
       const state = await window.electronAPI.getTimerState() as TimerState;
       setTimerState(state);
@@ -253,6 +261,24 @@ export function TrayView() {
     } catch (error) {
       console.error('Failed to delete timesheet:', error);
     }
+  };
+
+  const handleWorkSessionStart = async () => {
+    if (!window.electronAPI) return;
+    const state = await window.electronAPI.workSessionStart();
+    setWorkSession(state);
+  };
+
+  const handleWorkSessionPause = async () => {
+    if (!window.electronAPI) return;
+    const state = await window.electronAPI.workSessionPause();
+    setWorkSession(state);
+  };
+
+  const handleWorkSessionStop = async () => {
+    if (!window.electronAPI) return;
+    const state = await window.electronAPI.workSessionStop();
+    setWorkSession(state);
   };
 
   const handleSelectCustomer = async (customer: KimaiCustomer) => {
@@ -691,6 +717,72 @@ export function TrayView() {
               <div title={`Kimai: ${connectionStatus}`} className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
               <div title={`ActivityWatch: ${awStatus}`} className={`h-2 w-2 rounded-full ${awStatus === 'connected' ? 'bg-blue-500' : awStatus === 'disabled' ? 'bg-gray-400' : 'bg-red-500'}`} />
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Work Session Controls */}
+      <div className="p-2 border-b border-border bg-muted/20">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Clock className="h-4 w-4 text-muted-foreground" />
+            <span className="text-xs font-medium">
+              {workSession.status === 'stopped' && 'Not at work'}
+              {workSession.status === 'active' && 'Working'}
+              {workSession.status === 'paused' && 'On break'}
+            </span>
+            {workSession.status !== 'stopped' && !timerState?.isRunning && workSession.status === 'active' && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-600 rounded animate-pulse">
+                Not tracking!
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-1">
+            {workSession.status === 'stopped' && (
+              <button
+                onClick={handleWorkSessionStart}
+                className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1"
+              >
+                <Play className="h-3 w-3" />
+                Start
+              </button>
+            )}
+            {workSession.status === 'active' && (
+              <>
+                <button
+                  onClick={handleWorkSessionPause}
+                  className="px-2 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded flex items-center gap-1"
+                >
+                  <Pause className="h-3 w-3" />
+                  Pause
+                </button>
+                <button
+                  onClick={handleWorkSessionStop}
+                  className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded flex items-center gap-1"
+                >
+                  <Square className="h-3 w-3" />
+                  Stop
+                </button>
+              </>
+            )}
+            {workSession.status === 'paused' && (
+              <>
+                <button
+                  onClick={handleWorkSessionStart}
+                  className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1"
+                >
+                  <Play className="h-3 w-3" />
+                  Resume
+                </button>
+                <button
+                  onClick={handleWorkSessionStop}
+                  className="px-2 py-1 text-xs bg-red-500 hover:bg-red-600 text-white rounded flex items-center gap-1"
+                >
+                  <Square className="h-3 w-3" />
+                  Stop
+                </button>
+              </>
+            )}
           </div>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import { IPC_CHANNELS, AppSettings, KimaiTimesheetCreate } from './types';
+import { IPC_CHANNELS, AppSettings, KimaiTimesheetCreate, WorkSessionState } from './types';
 
 // Expose protected methods that allow the renderer process to use
 // ipcRenderer without exposing the entire object
@@ -40,6 +40,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Timer State
   getTimerState: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TIMER_STATE),
 
+  // Work Session
+  workSessionStart: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_START),
+  workSessionPause: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_PAUSE),
+  workSessionStop: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_STOP),
+  workSessionGetState: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_GET_STATE),
+
   // Window
   openSettings: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_SETTINGS),
   openTimeEntry: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_TIME_ENTRY),
@@ -67,6 +73,10 @@ export interface ElectronAPI {
   jiraSearchIssues: (jql: string, maxResults?: number) => Promise<unknown[]>;
   jiraAddWorklog: (issueKey: string, timeSpentSeconds: number, started: string, comment?: string) => Promise<{ id: string }>;
   getTimerState: () => Promise<unknown>;
+  workSessionStart: () => Promise<WorkSessionState>;
+  workSessionPause: () => Promise<WorkSessionState>;
+  workSessionStop: () => Promise<WorkSessionState>;
+  workSessionGetState: () => Promise<WorkSessionState>;
   openSettings: () => Promise<void>;
   openTimeEntry: () => Promise<void>;
   closeWindow: () => Promise<void>;
