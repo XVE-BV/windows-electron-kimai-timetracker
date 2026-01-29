@@ -25,7 +25,7 @@ import {
 import { getUserMessage } from './errors';
 import { formatDurationCompact } from './utils';
 import { REMINDER_INTERVAL_MS } from './constants';
-import { initAutoUpdater } from './services/updater';
+import { initAutoUpdater, getUpdateStatus, checkForUpdates, quitAndInstall } from './services/updater';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -698,6 +698,16 @@ function setupIPC(): void {
 
   ipcMain.handle(IPC_CHANNELS.OPEN_DEBUG, () => {
     navigateTrayWindow(VIEW_HASHES.DEBUG);
+  });
+
+  // Updates
+  ipcMain.handle(IPC_CHANNELS.GET_UPDATE_STATUS, () => getUpdateStatus());
+  ipcMain.handle(IPC_CHANNELS.CHECK_FOR_UPDATES, () => {
+    checkForUpdates();
+    return getUpdateStatus();
+  });
+  ipcMain.handle(IPC_CHANNELS.QUIT_AND_INSTALL, () => {
+    quitAndInstall();
   });
 
   // GitHub

@@ -88,6 +88,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debugClearLogs: () => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_CLEAR_LOGS),
   openDebug: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_DEBUG),
 
+  // Updates
+  getUpdateStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_UPDATE_STATUS),
+  checkForUpdates: () => ipcRenderer.invoke(IPC_CHANNELS.CHECK_FOR_UPDATES),
+  quitAndInstall: () => ipcRenderer.invoke(IPC_CHANNELS.QUIT_AND_INSTALL),
+  onUpdateStatusChanged: (callback: (status: { status: string; version?: string; error?: string }) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, status: { status: string; version?: string; error?: string }) => callback(status);
+    ipcRenderer.on('update-status-changed', listener);
+    return () => ipcRenderer.removeListener('update-status-changed', listener);
+  },
+
   // Events
   onSettingsChanged: (callback: () => void) => {
     ipcRenderer.on('settings-changed', callback);
@@ -151,6 +161,10 @@ export interface ElectronAPI {
   }>>;
   debugClearLogs: () => Promise<{ success: boolean }>;
   openDebug: () => Promise<void>;
+  getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;
+  checkForUpdates: () => Promise<{ status: string; version?: string; error?: string }>;
+  quitAndInstall: () => Promise<void>;
+  onUpdateStatusChanged: (callback: (status: { status: string; version?: string; error?: string }) => void) => () => void;
   onSettingsChanged: (callback: () => void) => () => void;
 }
 

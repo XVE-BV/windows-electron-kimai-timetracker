@@ -248,6 +248,11 @@ export const IPC_CHANNELS = {
   DEBUG_GET_LOGS: 'debug-get-logs',
   DEBUG_CLEAR_LOGS: 'debug-clear-logs',
   OPEN_DEBUG: 'open-debug',
+
+  // Updates
+  GET_UPDATE_STATUS: 'get-update-status',
+  CHECK_FOR_UPDATES: 'check-for-updates',
+  QUIT_AND_INSTALL: 'quit-and-install',
 } as const;
 
 // Default Settings

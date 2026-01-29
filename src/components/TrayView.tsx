@@ -3,7 +3,7 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, RefreshCw, Monitor, Layers, Briefcase,
   FileText, Search, X, Users, Ticket, Trash2, AlertCircle, ScrollText,
-  Bell, BellOff, Bug, PanelRightClose, Moon, Sun, Laptop, Star
+  Bell, BellOff, Bug, PanelRightClose, Moon, Sun, Laptop, Star, Download
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem, ThemeMode } from '../types';
@@ -49,6 +49,9 @@ export function TrayView() {
 
   // Favorite customers
   const [favoriteCustomerIds, setFavoriteCustomerIds] = useState<number[]>([]);
+
+  // Update status
+  const [updateStatus, setUpdateStatus] = useState<{ status: string; version?: string }>({ status: 'idle' });
 
   // Panel states
   const [recentEntriesOpen, setRecentEntriesOpen] = useState(false);
@@ -296,10 +299,19 @@ export function TrayView() {
       loadData();
     });
 
+    // Load update status
+    window.electronAPI?.getUpdateStatus?.().then(setUpdateStatus);
+
+    // Listen for update status changes
+    const unsubscribeUpdate = window.electronAPI?.onUpdateStatusChanged?.((status) => {
+      setUpdateStatus(status);
+    });
+
     return () => {
       clearInterval(interval);
       clearInterval(dataInterval);
       unsubscribe?.();
+      unsubscribeUpdate?.();
       // Clean up error timeout
       if (errorTimeoutRef.current) {
         clearTimeout(errorTimeoutRef.current);
@@ -1351,6 +1363,30 @@ export function TrayView() {
               </div>
             )}
           </div>
+        </div>
+      )}
+
+      {/* Update Available Banner */}
+      {updateStatus.status === 'ready' && (
+        <div className="px-3 py-2 bg-green-500/10 border-t border-green-500/30 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Download className="h-4 w-4 text-green-600" />
+            <span className="text-xs text-green-700">
+              Update {updateStatus.version || 'available'}
+            </span>
+          </div>
+          <button
+            onClick={() => window.electronAPI?.quitAndInstall()}
+            className="px-2 py-1 text-xs font-medium bg-green-600 text-white rounded hover:bg-green-700"
+          >
+            Update Now
+          </button>
+        </div>
+      )}
+      {updateStatus.status === 'downloading' && (
+        <div className="px-3 py-2 bg-blue-500/10 border-t border-blue-500/30 flex items-center gap-2">
+          <RefreshCw className="h-4 w-4 text-blue-600 animate-spin" />
+          <span className="text-xs text-blue-700">Downloading update...</span>
         </div>
       )}
 
