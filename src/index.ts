@@ -742,13 +742,17 @@ async function initializeApp(): Promise<void> {
   // Create tray popup window
   createTrayWindow();
 
-  // Handle tray clicks - both left and right show custom popup
+  // Handle tray clicks
   tray.on('click', () => {
     toggleTrayWindow();
   });
 
+  // Right-click shows quit menu
   tray.on('right-click', () => {
-    toggleTrayWindow();
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Quit', click: () => app.quit() }
+    ]);
+    tray.popUpContextMenu(contextMenu);
   });
 
   // Check if timer was running (recover state)
