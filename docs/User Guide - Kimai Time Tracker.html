@@ -1,0 +1,211 @@
+<html>
+<head>
+<meta charset="UTF-8">
+<style>
+body { font-family: Calibri, Arial, sans-serif; max-width: 800px; margin: 40px auto; line-height: 1.6; }
+h1 { color: #2563eb; border-bottom: 2px solid #2563eb; padding-bottom: 10px; }
+h2 { color: #1e40af; margin-top: 30px; }
+h3 { color: #3b82f6; }
+.step { background: #f0f9ff; padding: 15px; margin: 10px 0; border-left: 4px solid #2563eb; }
+.tip { background: #fef3c7; padding: 15px; margin: 10px 0; border-left: 4px solid #f59e0b; }
+.warning { background: #fee2e2; padding: 15px; margin: 10px 0; border-left: 4px solid #ef4444; }
+img { max-width: 100%; }
+table { border-collapse: collapse; width: 100%; margin: 15px 0; }
+th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
+th { background: #2563eb; color: white; }
+</style>
+</head>
+<body>
+
+<h1>Kimai Time Tracker - User Guide</h1>
+
+<p><strong>Version:</strong> 1.0.0<br>
+<strong>Last Updated:</strong> January 2025</p>
+
+<h2>What is this app?</h2>
+<p>Kimai Time Tracker is a desktop application that helps you log your working hours to the Kimai time tracking system. It sits in your system tray and makes it easy to start and stop timers for different projects.</p>
+
+<h2>Installation</h2>
+
+<div class="step">
+<h3>Step 1: Run the installer</h3>
+<p>Double-click on <strong>"Kimai Time Tracker-1.0.0 Setup.exe"</strong></p>
+<p>The app will install automatically - no administrator rights needed.</p>
+</div>
+
+<div class="step">
+<h3>Step 2: Launch the app</h3>
+<p>After installation, the app starts automatically. You can also find it in your Start Menu under <strong>"Kimai Time Tracker"</strong>.</p>
+</div>
+
+<div class="step">
+<h3>Step 3: Find the tray icon</h3>
+<p>Look for the blue Kimai icon in your system tray (bottom-right corner of your screen, near the clock). Click it to open the app.</p>
+</div>
+
+<h2>First-Time Setup</h2>
+
+<div class="step">
+<h3>Configure your Kimai connection</h3>
+<ol>
+<li>Click the tray icon to open the app</li>
+<li>Click <strong>"Settings"</strong> at the bottom</li>
+<li>Enter your Kimai details:
+    <ul>
+    <li><strong>Kimai API URL:</strong> https://clockit.xve-web.eu/api</li>
+    <li><strong>API Token:</strong> Your personal API token (get this from Kimai website)</li>
+    </ul>
+</li>
+<li>Click <strong>"Test Connection"</strong> to verify it works</li>
+<li>Click <strong>"Save Settings"</strong></li>
+</ol>
+</div>
+
+<div class="tip">
+<strong>How to get your Kimai API Token:</strong><br>
+Log in to Kimai web interface, go to your profile, and find the API section to generate a token.
+</div>
+
+<h2>Jira Setup (Optional)</h2>
+
+<p>If you want to log time to Jira tickets, you need to configure Jira in Settings.</p>
+
+<h3>Getting your Jira API Token</h3>
+
+<div class="step">
+<ol>
+<li>Go to <strong><a href="https://id.atlassian.com/manage-profile/security/api-tokens">https://id.atlassian.com/manage-profile/security/api-tokens</a></strong></li>
+<li>Log in with your Atlassian account</li>
+<li>Click <strong>"Create API token"</strong></li>
+<li>Give it a name like <strong>"Kimai Time Tracker"</strong></li>
+<li>Click <strong>"Create"</strong></li>
+<li>Copy the token immediately (you won't see it again!)</li>
+</ol>
+</div>
+
+<div class="tip">
+<strong>Recommended: Use scoped API tokens</strong><br><br>
+If your organization supports API tokens with scopes (OAuth 2.0), select only these scopes:
+<ul>
+<li><strong>read:jira-work</strong> - to view and search issues</li>
+<li><strong>write:jira-work</strong> - to log time to issues</li>
+</ul>
+<br>
+This limits what the app can do and is safer than full access tokens.
+</div>
+
+<div class="warning">
+<strong>Security Warning:</strong><br><br>
+Standard API tokens (from id.atlassian.com) have <strong>full access</strong> to your account - they cannot be scoped. Keep them safe:
+<ul>
+<li>Never share your API token</li>
+<li>Don't send via email or chat</li>
+<li>Revoke immediately if compromised</li>
+<li>Use a separate token for each app</li>
+</ul>
+</div>
+
+<h3>Configuring Jira in the App</h3>
+
+<div class="step">
+<ol>
+<li>Open Settings in the app</li>
+<li>Scroll to the Jira section</li>
+<li>Enable Jira integration</li>
+<li>Enter your details:
+    <ul>
+    <li><strong>Jira URL:</strong> https://your-company.atlassian.net (ask your admin)</li>
+    <li><strong>Email:</strong> Your Atlassian account email</li>
+    <li><strong>API Token:</strong> The token you just created</li>
+    </ul>
+</li>
+<li>Click <strong>"Test Jira"</strong> to verify</li>
+<li>Click <strong>"Save Settings"</strong></li>
+</ol>
+</div>
+
+<h2>Daily Usage</h2>
+
+<h3>Starting a Timer</h3>
+<ol>
+<li>Click the tray icon to open the app</li>
+<li>Select a <strong>Customer</strong></li>
+<li>Select a <strong>Project</strong></li>
+<li>Select an <strong>Activity</strong></li>
+<li>(Optional) Add a description of what you're working on</li>
+<li>Click the green <strong>"Start Timer"</strong> button</li>
+</ol>
+
+<h3>Stopping a Timer</h3>
+<ol>
+<li>Click the tray icon to open the app</li>
+<li>Click the red <strong>"Stop Timer"</strong> button</li>
+<li>Your time is automatically saved to Kimai</li>
+</ol>
+
+<h3>Using with Jira (Optional)</h3>
+<p>If Jira integration is enabled, you can link your time to a Jira ticket:</p>
+<ol>
+<li>Click <strong>"Link Jira ticket..."</strong></li>
+<li>Select your ticket from the list</li>
+<li>Start your timer as normal</li>
+<li>When you stop, time is logged to Kimai</li>
+<li>If <strong>"Auto-log time to Jira"</strong> is enabled in Settings, time is also logged to Jira</li>
+</ol>
+
+<div class="tip">
+<strong>Note:</strong> Auto-logging to Jira is disabled by default. Enable it in Settings under Jira Cloud if you want time automatically logged to Jira when stopping the timer.
+</div>
+
+<h2>Work Session Tracking</h2>
+
+<p>The app can remind you when you forget to track time:</p>
+
+<table>
+<tr><th>Button</th><th>What it does</th></tr>
+<tr><td><strong>Start</strong></td><td>Begin your work day - app will remind you if you're not tracking</td></tr>
+<tr><td><strong>Pause</strong></td><td>Taking a break - reminders are paused</td></tr>
+<tr><td><strong>Stop</strong></td><td>End your work day - no more reminders</td></tr>
+</table>
+
+<h2>Adding Manual Time Entries</h2>
+
+<p>If you forgot to start the timer, you can add time manually:</p>
+<ol>
+<li>Click <strong>"Manual Entry"</strong> at the bottom of the app</li>
+<li>Select the date, start time, and end time</li>
+<li>Choose your project and activity</li>
+<li>Click <strong>"Save Entry"</strong></li>
+</ol>
+
+<h2>Troubleshooting</h2>
+
+<table>
+<tr><th>Problem</th><th>Solution</th></tr>
+<tr><td>App won't connect to Kimai</td><td>Check your API URL and token in Settings. Make sure you're connected to the internet.</td></tr>
+<tr><td>Can't see my projects</td><td>Your Kimai account may not have access to those projects. Contact your administrator.</td></tr>
+<tr><td>Timer won't start</td><td>Make sure you've selected a Customer, Project, AND Activity.</td></tr>
+<tr><td>Jira login failed</td><td>Check your Jira email and API token in Settings.</td></tr>
+</table>
+
+<div class="warning">
+<strong>Important:</strong> Don't share your API tokens with anyone. They give full access to your Kimai account.
+</div>
+
+<h2>Keyboard Shortcuts</h2>
+
+<table>
+<tr><th>Action</th><th>How to do it</th></tr>
+<tr><td>Open app</td><td>Click the tray icon</td></tr>
+<tr><td>Close app</td><td>Click anywhere outside the window, or minimize it</td></tr>
+</table>
+
+<h2>Need Help?</h2>
+
+<p>Contact your IT department or system administrator if you experience issues with the application.</p>
+
+<hr>
+<p style="color: #666; font-size: 12px;">This application was developed for internal use. For technical support, contact the development team.</p>
+
+</body>
+</html>

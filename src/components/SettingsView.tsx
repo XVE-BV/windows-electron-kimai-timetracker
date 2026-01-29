@@ -31,6 +31,7 @@ export function SettingsView() {
   const [jiraUrl, setJiraUrl] = useState('');
   const [jiraEmail, setJiraEmail] = useState('');
   const [jiraToken, setJiraToken] = useState('');
+  const [jiraAutoLogWorklog, setJiraAutoLogWorklog] = useState(false);
   const [jiraStatus, setJiraStatus] = useState<ConnectionStatus>('idle');
   const [jiraMessage, setJiraMessage] = useState('');
 
@@ -60,6 +61,7 @@ export function SettingsView() {
       setJiraUrl(s.jira?.apiUrl || '');
       setJiraEmail(s.jira?.email || '');
       setJiraToken(s.jira?.apiToken || '');
+      setJiraAutoLogWorklog(s.jira?.autoLogWorklog || false);
       setUseDefaults(s.useDefaults || false);
       setDefaultCustomer(s.defaultCustomerId?.toString() || 'none');
       setDefaultProject(s.defaultProjectId?.toString() || 'none');
@@ -120,7 +122,7 @@ export function SettingsView() {
     const tempSettings: AppSettings = {
       ...settings!,
       kimai: { apiUrl: kimaiUrl, apiToken: kimaiToken },
-      jira: settings?.jira || { apiUrl: '', email: '', apiToken: '', enabled: false },
+      jira: settings?.jira || { apiUrl: '', email: '', apiToken: '', enabled: false, autoLogWorklog: false },
     };
     await window.electronAPI.saveSettings(tempSettings);
 
@@ -148,7 +150,7 @@ export function SettingsView() {
     const tempSettings: AppSettings = {
       ...settings!,
       activityWatch: { apiUrl: awUrl, enabled: awEnabled },
-      jira: settings?.jira || { apiUrl: '', email: '', apiToken: '', enabled: false },
+      jira: settings?.jira || { apiUrl: '', email: '', apiToken: '', enabled: false, autoLogWorklog: false },
     };
     await window.electronAPI.saveSettings(tempSettings);
 
@@ -170,7 +172,7 @@ export function SettingsView() {
 
     const tempSettings: AppSettings = {
       ...settings!,
-      jira: { apiUrl: jiraUrl, email: jiraEmail, apiToken: jiraToken, enabled: jiraEnabled },
+      jira: { apiUrl: jiraUrl, email: jiraEmail, apiToken: jiraToken, enabled: jiraEnabled, autoLogWorklog: jiraAutoLogWorklog },
     };
     await window.electronAPI.saveSettings(tempSettings);
 
@@ -206,6 +208,7 @@ export function SettingsView() {
         email: jiraEmail,
         apiToken: jiraToken,
         enabled: jiraEnabled,
+        autoLogWorklog: jiraAutoLogWorklog,
       },
       autoStartTimer: settings.autoStartTimer,
       useDefaults,
@@ -429,6 +432,14 @@ export function SettingsView() {
                   {jiraMessage}
                 </span>
               )}
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t">
+              <div>
+                <Label>Auto-log time to Jira</Label>
+                <p className="text-xs text-muted-foreground">Automatically log work to Jira when stopping timer</p>
+              </div>
+              <Switch checked={jiraAutoLogWorklog} onCheckedChange={setJiraAutoLogWorklog} />
             </div>
           </CardContent>
         )}

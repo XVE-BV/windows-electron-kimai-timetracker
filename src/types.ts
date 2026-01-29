@@ -89,6 +89,7 @@ export interface JiraSettings {
   email: string;       // Atlassian account email
   apiToken: string;    // API token
   enabled: boolean;
+  autoLogWorklog: boolean; // Automatically log time to Jira when stopping timer
 }
 
 export interface JiraIssue {
@@ -238,6 +239,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     email: '',
     apiToken: '',
     enabled: false,
+    autoLogWorklog: false,
   },
   autoStartTimer: false,
   useDefaults: false,

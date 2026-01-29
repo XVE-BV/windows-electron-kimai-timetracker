@@ -35,6 +35,7 @@ export function TrayView() {
 
   // Jira state
   const [jiraEnabled, setJiraEnabled] = useState(false);
+  const [jiraAutoLogWorklog, setJiraAutoLogWorklog] = useState(false);
   const [jiraIssues, setJiraIssues] = useState<JiraIssue[]>([]);
   const [selectedJiraIssue, setSelectedJiraIssue] = useState<JiraIssue | null>(null);
   const [jiraStatus, setJiraStatus] = useState<'connected' | 'disconnected' | 'disabled'>('disabled');
@@ -210,11 +211,13 @@ export function TrayView() {
       const settings = await window.electronAPI.getSettings();
       if (settings.jira?.enabled) {
         setJiraEnabled(true);
+        setJiraAutoLogWorklog(settings.jira?.autoLogWorklog || false);
         const issues = await window.electronAPI.jiraGetMyIssues(MAX_JIRA_ISSUES);
         setJiraIssues(issues);
         setJiraStatus('connected');
       } else {
         setJiraEnabled(false);
+        setJiraAutoLogWorklog(false);
         setJiraStatus('disabled');
       }
     } catch (error) {
@@ -285,9 +288,9 @@ export function TrayView() {
 
         await window.electronAPI.kimaiStopTimer();
 
-        // Log to Jira if a ticket was linked
+        // Log to Jira if a ticket was linked and auto-log is enabled
         let jiraSuccess = true;
-        if (jiraIssueToLog && timerStartTime && jiraEnabled) {
+        if (jiraIssueToLog && timerStartTime && jiraEnabled && jiraAutoLogWorklog) {
           try {
             const startDate = new Date(timerStartTime);
             const endDate = new Date();
