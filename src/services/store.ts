@@ -2,6 +2,37 @@ import Store from 'electron-store';
 import { safeStorage } from 'electron';
 import { AppSettings, TimerState, DEFAULT_SETTINGS } from '../types';
 
+/**
+ * Merge stored settings with defaults, ensuring all required fields exist
+ * Stored values take precedence over defaults
+ */
+function mergeSettings(stored: Partial<AppSettings> | null | undefined): AppSettings {
+  if (!stored) {
+    return { ...DEFAULT_SETTINGS };
+  }
+
+  return {
+    kimai: {
+      ...DEFAULT_SETTINGS.kimai,
+      ...stored.kimai,
+    },
+    activityWatch: {
+      ...DEFAULT_SETTINGS.activityWatch,
+      ...stored.activityWatch,
+    },
+    jira: {
+      ...DEFAULT_SETTINGS.jira,
+      ...stored.jira,
+    },
+    autoStartTimer: stored.autoStartTimer ?? DEFAULT_SETTINGS.autoStartTimer,
+    useDefaults: stored.useDefaults ?? DEFAULT_SETTINGS.useDefaults,
+    defaultCustomerId: stored.defaultCustomerId ?? DEFAULT_SETTINGS.defaultCustomerId,
+    defaultProjectId: stored.defaultProjectId ?? DEFAULT_SETTINGS.defaultProjectId,
+    defaultActivityId: stored.defaultActivityId ?? DEFAULT_SETTINGS.defaultActivityId,
+    syncInterval: stored.syncInterval ?? DEFAULT_SETTINGS.syncInterval,
+  };
+}
+
 // Store schema - tokens are stored encrypted
 interface StoreSchema {
   settings: AppSettings;
@@ -51,8 +82,15 @@ function decryptString(value: string): string {
       const buffer = Buffer.from(value, 'base64');
       return safeStorage.decryptString(buffer);
     } catch (error) {
-      // Might be an old unencrypted value, try using as-is
-      console.warn('Failed to decrypt, using value as-is');
+      // Check if it looks like a base64-encoded encrypted value that failed
+      const isLikelyEncrypted = /^[A-Za-z0-9+/=]+$/.test(value) && value.length > 50;
+      if (isLikelyEncrypted) {
+        // Likely corrupted encrypted data - return empty string instead of garbage
+        console.warn('Failed to decrypt encrypted token, returning empty string');
+        return '';
+      }
+      // Might be an old unencrypted value (plain text token), try using as-is
+      console.warn('Failed to decrypt, using value as-is (likely plain text)');
       return value;
     }
   }
@@ -60,17 +98,32 @@ function decryptString(value: string): string {
 }
 
 export function getSettings(): AppSettings {
-  const settings = store.get('settings');
-  const encryptedTokens = store.get('encryptedTokens');
+  let storedSettings: Partial<AppSettings> | null = null;
+
+  try {
+    storedSettings = store.get('settings') as Partial<AppSettings>;
+  } catch (error) {
+    console.error('Failed to read settings from store, using defaults:', error);
+  }
+
+  // Merge stored settings with defaults to handle schema changes
+  // This ensures new fields added to DEFAULT_SETTINGS are always present
+  const settings = mergeSettings(storedSettings);
 
   // Decrypt tokens
-  if (encryptedTokens) {
-    if (encryptedTokens.kimaiToken) {
-      settings.kimai.apiToken = decryptString(encryptedTokens.kimaiToken);
+  try {
+    const encryptedTokens = store.get('encryptedTokens');
+    if (encryptedTokens) {
+      if (encryptedTokens.kimaiToken) {
+        settings.kimai.apiToken = decryptString(encryptedTokens.kimaiToken);
+      }
+      if (encryptedTokens.jiraToken && settings.jira) {
+        settings.jira.apiToken = decryptString(encryptedTokens.jiraToken);
+      }
     }
-    if (encryptedTokens.jiraToken && settings.jira) {
-      settings.jira.apiToken = decryptString(encryptedTokens.jiraToken);
-    }
+  } catch (error) {
+    console.error('Failed to decrypt tokens:', error);
+    // Leave tokens as empty strings (from defaults)
   }
 
   return settings;
@@ -103,8 +156,27 @@ export function saveSettings(settings: AppSettings): void {
   store.set('settings', settingsWithoutTokens);
 }
 
+const DEFAULT_TIMER_STATE: TimerState = {
+  isRunning: false,
+  currentTimesheetId: null,
+  startTime: null,
+  projectId: null,
+  activityId: null,
+  description: '',
+};
+
 export function getTimerState(): TimerState {
-  return store.get('timerState');
+  try {
+    const stored = store.get('timerState') as Partial<TimerState> | undefined;
+    if (!stored) {
+      return DEFAULT_TIMER_STATE;
+    }
+    // Merge with defaults to ensure all fields are present
+    return { ...DEFAULT_TIMER_STATE, ...stored };
+  } catch (error) {
+    console.error('Failed to read timer state from store:', error);
+    return DEFAULT_TIMER_STATE;
+  }
 }
 
 export function saveTimerState(state: TimerState): void {

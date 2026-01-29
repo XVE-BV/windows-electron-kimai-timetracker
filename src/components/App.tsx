@@ -3,6 +3,7 @@ import { SettingsView } from './SettingsView';
 import { TimeEntryView } from './TimeEntryView';
 import { MainView } from './MainView';
 import { TrayView } from './TrayView';
+import { ErrorBoundary } from './ErrorBoundary';
 
 type View = 'main' | 'settings' | 'time-entry' | 'tray';
 
@@ -29,11 +30,13 @@ export function App() {
   }, []);
 
   return (
-    <div className={`${view === 'tray' ? '' : 'min-h-screen'} bg-background animate-fade-in`}>
-      {view === 'settings' && <SettingsView />}
-      {view === 'time-entry' && <TimeEntryView />}
-      {view === 'tray' && <TrayView />}
-      {view === 'main' && <MainView />}
-    </div>
+    <ErrorBoundary>
+      <div className={`${view === 'tray' ? '' : 'min-h-screen'} bg-background animate-fade-in`}>
+        {view === 'settings' && <SettingsView />}
+        {view === 'time-entry' && <TimeEntryView />}
+        {view === 'tray' && <TrayView />}
+        {view === 'main' && <MainView />}
+      </div>
+    </ErrorBoundary>
   );
 }

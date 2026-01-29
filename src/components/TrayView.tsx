@@ -3,7 +3,7 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, CheckCircle2, XCircle, RefreshCw, Coffee,
   Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket, Trash2,
-  Pause, Clock
+  Pause, Clock, AlertCircle
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState } from '../types';
@@ -48,6 +48,32 @@ export function TrayView() {
 
   // Work session state
   const [workSession, setWorkSession] = useState<WorkSessionState>({ status: 'stopped', startedAt: null });
+
+  // Error notification state
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const errorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Show error message with auto-dismiss
+  const showError = useCallback((message: string) => {
+    // Clear any existing timeout
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+    }
+    setErrorMessage(message);
+    // Auto-dismiss after 5 seconds
+    errorTimeoutRef.current = setTimeout(() => {
+      setErrorMessage(null);
+      errorTimeoutRef.current = null;
+    }, 5000);
+  }, []);
+
+  const dismissError = useCallback(() => {
+    if (errorTimeoutRef.current) {
+      clearTimeout(errorTimeoutRef.current);
+      errorTimeoutRef.current = null;
+    }
+    setErrorMessage(null);
+  }, []);
 
   // Use imported formatDurationHuman for display
   const formatDuration = formatDurationHuman;
@@ -220,6 +246,10 @@ export function TrayView() {
       clearInterval(interval);
       clearInterval(dataInterval);
       unsubscribe?.();
+      // Clean up error timeout
+      if (errorTimeoutRef.current) {
+        clearTimeout(errorTimeoutRef.current);
+      }
     };
   }, [loadData]);
 
@@ -279,10 +309,9 @@ export function TrayView() {
               startDate.toISOString(),
               description || undefined
             );
-            console.log(`Logged ${durationSeconds}s to Jira ${jiraIssueToLog.key}`);
           } catch (error) {
-            // TODO: Show user notification about Jira failure
             console.error('Failed to log to Jira:', error);
+            showError(`Failed to log time to Jira ${jiraIssueToLog.key}. Time was logged to Kimai only.`);
           }
         }
 
@@ -303,28 +332,44 @@ export function TrayView() {
     if (!window.electronAPI) return;
     try {
       await window.electronAPI.kimaiDeleteTimesheet(id);
-      loadData(); // Refresh the list
+      await loadData(); // Refresh the list
     } catch (error) {
       console.error('Failed to delete timesheet:', error);
+      showError('Failed to delete time entry');
     }
   };
 
   const handleWorkSessionStart = async () => {
     if (!window.electronAPI) return;
-    const state = await window.electronAPI.workSessionStart();
-    setWorkSession(state);
+    try {
+      const state = await window.electronAPI.workSessionStart();
+      setWorkSession(state);
+    } catch (error) {
+      console.error('Failed to start work session:', error);
+      showError('Failed to start work session');
+    }
   };
 
   const handleWorkSessionPause = async () => {
     if (!window.electronAPI) return;
-    const state = await window.electronAPI.workSessionPause();
-    setWorkSession(state);
+    try {
+      const state = await window.electronAPI.workSessionPause();
+      setWorkSession(state);
+    } catch (error) {
+      console.error('Failed to pause work session:', error);
+      showError('Failed to pause work session');
+    }
   };
 
   const handleWorkSessionStop = async () => {
     if (!window.electronAPI) return;
-    const state = await window.electronAPI.workSessionStop();
-    setWorkSession(state);
+    try {
+      const state = await window.electronAPI.workSessionStop();
+      setWorkSession(state);
+    } catch (error) {
+      console.error('Failed to stop work session:', error);
+      showError('Failed to stop work session');
+    }
   };
 
   const handleSelectCustomer = async (customer: KimaiCustomer) => {
@@ -341,8 +386,14 @@ export function TrayView() {
     if (!window.electronAPI) return;
     setSelectedProject(project);
     setSelectedActivity(null);
-    const acts = await window.electronAPI.kimaiGetActivities(project.id);
-    setActivities(acts);
+    try {
+      const acts = await window.electronAPI.kimaiGetActivities(project.id);
+      setActivities(acts);
+    } catch (error) {
+      console.error('Failed to load activities:', error);
+      showError('Failed to load activities');
+      setActivities([]);
+    }
     setSearchQuery('');
     setView('activities');
   };
@@ -738,6 +789,23 @@ export function TrayView() {
   // Main view - comprehensive
   return (
     <div className="w-full bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
+      {/* Error Toast */}
+      {errorMessage && (
+        <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/30 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2 min-w-0">
+            <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+            <span className="text-xs text-red-600 truncate">{errorMessage}</span>
+          </div>
+          <button
+            onClick={dismissError}
+            className="p-0.5 hover:bg-red-500/20 rounded flex-shrink-0"
+            aria-label="Dismiss error"
+          >
+            <X className="h-3 w-3 text-red-500" />
+          </button>
+        </div>
+      )}
+
       {/* Header with Status */}
       <div className="p-3 bg-gradient-to-r from-primary/10 to-primary/5 border-b border-border">
         <div className="flex items-center justify-between">
@@ -1064,8 +1132,8 @@ export function TrayView() {
             <span className="text-xs font-medium text-muted-foreground">Activity (Last Hour)</span>
           </div>
           <div className="px-3 py-2 space-y-2">
-            {activitySummary.map((item, i) => (
-              <div key={i} className="flex items-start justify-between gap-2">
+            {activitySummary.map((item) => (
+              <div key={`${item.app}:${item.title}`} className="flex items-start justify-between gap-2">
                 <div className="flex items-start gap-2 min-w-0 flex-1">
                   <Zap className="h-3 w-3 text-blue-500 flex-shrink-0 mt-0.5" />
                   <div className="min-w-0 flex-1">

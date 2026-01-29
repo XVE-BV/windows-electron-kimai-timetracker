@@ -253,9 +253,9 @@ export function TimeEntryView() {
               </p>
             ) : (
               <div className="space-y-2 max-h-48 overflow-y-auto">
-                {suggestions.map((s, i) => (
+                {suggestions.map((s) => (
                   <button
-                    key={i}
+                    key={`${s.app}:${s.title}`}
                     onClick={() => handleSuggestionClick(s)}
                     className="w-full flex items-center justify-between p-3 rounded-lg bg-muted/50 hover:bg-muted transition-colors text-left"
                   >

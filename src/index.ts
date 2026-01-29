@@ -21,6 +21,8 @@ import {
   sanitizeJql,
 } from './validation';
 import { ValidationError, getUserMessage } from './errors';
+import { formatDurationCompact } from './utils';
+import { TRAY_WINDOW_WIDTH, TRAY_WINDOW_HEIGHT, WORK_SESSION_REMINDER_INTERVAL_MS } from './constants';
 
 declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
@@ -49,13 +51,8 @@ let workSessionState: WorkSessionState = {
   startedAt: null,
 };
 
-// Work session reminder interval (check every minute)
+// Work session reminder interval
 let workSessionReminderInterval: NodeJS.Timeout | null = null;
-const REMINDER_INTERVAL_MS = 60 * 1000; // 1 minute
-
-// Tray window dimensions
-const TRAY_WINDOW_WIDTH = 380;
-const TRAY_WINDOW_HEIGHT = 600;
 
 function createTrayIcon(): Electron.NativeImage {
   const fs = require('fs');
@@ -89,17 +86,6 @@ function createTrayIcon(): Electron.NativeImage {
     buffer[i * 4 + 3] = 255; // A
   }
   return nativeImage.createFromBuffer(buffer, { width: size, height: size });
-}
-
-function formatDuration(seconds: number): string {
-  const hours = Math.floor(seconds / 3600);
-  const minutes = Math.floor((seconds % 3600) / 60);
-  const secs = Math.floor(seconds % 60);
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  }
-  return `${minutes}:${String(secs).padStart(2, '0')}`;
 }
 
 function getElapsedSeconds(): number {
@@ -149,7 +135,7 @@ async function buildContextMenu(): Promise<Menu> {
     },
   }));
 
-  const elapsedTime = formatDuration(getElapsedSeconds());
+  const elapsedTime = formatDurationCompact(getElapsedSeconds());
 
   const menuTemplate: Electron.MenuItemConstructorOptions[] = [
     // Timer Status
@@ -224,7 +210,7 @@ async function updateTrayMenu(): Promise<void> {
     // Update tooltip with current status
     const timerState = getTimerState();
     if (timerState.isRunning) {
-      const elapsed = formatDuration(getElapsedSeconds());
+      const elapsed = formatDurationCompact(getElapsedSeconds());
       tray.setToolTip(`Kimai Time Tracker - Running: ${elapsed}`);
     } else {
       tray.setToolTip('Kimai Time Tracker - Idle');
@@ -269,7 +255,7 @@ async function stopTimer(): Promise<void> {
 
   try {
     await kimaiAPI.stopTimer(timerState.currentTimesheetId);
-    const elapsed = formatDuration(getElapsedSeconds());
+    const elapsed = formatDurationCompact(getElapsedSeconds());
 
     updateTimerState({
       isRunning: false,
@@ -342,7 +328,7 @@ function startWorkSessionReminder(): void {
   checkAndRemind();
 
   // Then check every minute
-  workSessionReminderInterval = setInterval(checkAndRemind, REMINDER_INTERVAL_MS);
+  workSessionReminderInterval = setInterval(checkAndRemind, WORK_SESSION_REMINDER_INTERVAL_MS);
 }
 
 function stopWorkSessionReminder(): void {
@@ -546,7 +532,7 @@ async function openActivitySummary(): Promise<void> {
     // Show top 5 activities
     const topActivities = summary.slice(0, 5);
     const message = topActivities
-      .map((a) => `${a.app}: ${formatDuration(a.duration)}`)
+      .map((a) => `${a.app}: ${formatDurationCompact(a.duration)}`)
       .join('\n');
 
     showNotification('Activity Summary (Last Hour)', message);
@@ -563,6 +549,9 @@ function setupIPC(): void {
     try {
       const validatedSettings = validateAppSettings(settings);
       saveSettings(validatedSettings);
+      // Invalidate cached data since API credentials may have changed
+      cachedProjects = [];
+      cachedActivities = [];
       await updateTrayMenu();
       // Notify tray window to refresh
       if (trayWindow && !trayWindow.isDestroyed()) {
