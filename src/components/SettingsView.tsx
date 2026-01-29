@@ -16,6 +16,7 @@ export function SettingsView() {
   const [kimaiToken, setKimaiToken] = useState('');
   const [awEnabled, setAwEnabled] = useState(true);
   const [awUrl, setAwUrl] = useState('http://localhost:5600');
+  const [useDefaults, setUseDefaults] = useState(false);
   const [defaultCustomer, setDefaultCustomer] = useState('none');
   const [defaultProject, setDefaultProject] = useState('none');
   const [defaultActivity, setDefaultActivity] = useState('none');
@@ -59,6 +60,7 @@ export function SettingsView() {
       setJiraUrl(s.jira?.apiUrl || '');
       setJiraEmail(s.jira?.email || '');
       setJiraToken(s.jira?.apiToken || '');
+      setUseDefaults(s.useDefaults || false);
       setDefaultCustomer(s.defaultCustomerId?.toString() || 'none');
       setDefaultProject(s.defaultProjectId?.toString() || 'none');
       setDefaultActivity(s.defaultActivityId?.toString() || 'none');
@@ -206,6 +208,7 @@ export function SettingsView() {
         enabled: jiraEnabled,
       },
       autoStartTimer: settings.autoStartTimer,
+      useDefaults,
       defaultCustomerId: defaultCustomer && defaultCustomer !== 'none' ? parseInt(defaultCustomer) : null,
       defaultProjectId: defaultProject && defaultProject !== 'none' ? parseInt(defaultProject) : null,
       defaultActivityId: defaultActivity && defaultActivity !== 'none' ? parseInt(defaultActivity) : null,
@@ -214,6 +217,13 @@ export function SettingsView() {
 
     await window.electronAPI.saveSettings(newSettings);
     window.electronAPI.closeWindow();
+  };
+
+  const handleUseDefaultsChange = (checked: boolean) => {
+    setUseDefaults(checked);
+    if (checked && customers.length === 0) {
+      loadCustomers();
+    }
   };
 
   const handleCustomerChange = (value: string) => {
@@ -427,57 +437,64 @@ export function SettingsView() {
       {/* Defaults */}
       <Card>
         <CardHeader className="pb-4">
-          <CardTitle className="text-lg">Defaults</CardTitle>
-          <CardDescription>Set your default customer, project and activity</CardDescription>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-lg">Defaults</CardTitle>
+              <CardDescription>Pre-fill customer, project and activity in tray</CardDescription>
+            </div>
+            <Switch checked={useDefaults} onCheckedChange={handleUseDefaultsChange} />
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label>Default Customer</Label>
-            <Combobox
-              options={[
-                { value: 'none', label: 'None' },
-                ...customers.map((c) => ({ value: c.id.toString(), label: c.name }))
-              ]}
-              value={defaultCustomer}
-              onValueChange={handleCustomerChange}
-              placeholder="Select a customer..."
-              searchPlaceholder="Search customers..."
-              emptyText="No customers found."
-            />
-          </div>
+        {useDefaults && (
+          <CardContent className="space-y-4">
+            <div className="space-y-2">
+              <Label>Default Customer</Label>
+              <Combobox
+                options={[
+                  { value: 'none', label: 'None' },
+                  ...customers.map((c) => ({ value: c.id.toString(), label: c.name }))
+                ]}
+                value={defaultCustomer}
+                onValueChange={handleCustomerChange}
+                placeholder="Select a customer..."
+                searchPlaceholder="Search customers..."
+                emptyText="No customers found."
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Default Project</Label>
-            <Combobox
-              options={[
-                { value: 'none', label: 'None' },
-                ...projects.map((p) => ({ value: p.id.toString(), label: p.name }))
-              ]}
-              value={defaultProject}
-              onValueChange={handleProjectChange}
-              placeholder="Select a project..."
-              searchPlaceholder="Search projects..."
-              emptyText="No projects found."
-              disabled={!defaultCustomer || defaultCustomer === 'none'}
-            />
-          </div>
+            <div className="space-y-2">
+              <Label>Default Project</Label>
+              <Combobox
+                options={[
+                  { value: 'none', label: 'None' },
+                  ...projects.map((p) => ({ value: p.id.toString(), label: p.name }))
+                ]}
+                value={defaultProject}
+                onValueChange={handleProjectChange}
+                placeholder="Select a project..."
+                searchPlaceholder="Search projects..."
+                emptyText="No projects found."
+                disabled={!defaultCustomer || defaultCustomer === 'none'}
+              />
+            </div>
 
-          <div className="space-y-2">
-            <Label>Default Activity</Label>
-            <Combobox
-              options={[
-                { value: 'none', label: 'None' },
-                ...activities.map((a) => ({ value: a.id.toString(), label: a.name }))
-              ]}
-              value={defaultActivity}
-              onValueChange={setDefaultActivity}
-              placeholder="Select an activity..."
-              searchPlaceholder="Search activities..."
-              emptyText="No activities found."
-              disabled={!defaultProject || defaultProject === 'none'}
-            />
-          </div>
-        </CardContent>
+            <div className="space-y-2">
+              <Label>Default Activity</Label>
+              <Combobox
+                options={[
+                  { value: 'none', label: 'None' },
+                  ...activities.map((a) => ({ value: a.id.toString(), label: a.name }))
+                ]}
+                value={defaultActivity}
+                onValueChange={setDefaultActivity}
+                placeholder="Select an activity..."
+                searchPlaceholder="Search activities..."
+                emptyText="No activities found."
+                disabled={!defaultProject || defaultProject === 'none'}
+              />
+            </div>
+          </CardContent>
+        )}
       </Card>
 
       {/* Actions */}

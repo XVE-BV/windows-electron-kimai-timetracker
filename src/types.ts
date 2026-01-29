@@ -148,6 +148,7 @@ export interface AppSettings {
   activityWatch: AWSettings;
   jira: JiraSettings;
   autoStartTimer: boolean;
+  useDefaults: boolean;
   defaultCustomerId: number | null;
   defaultProjectId: number | null;
   defaultActivityId: number | null;
@@ -232,6 +233,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     enabled: false,
   },
   autoStartTimer: false,
+  useDefaults: false,
   defaultCustomerId: null,
   defaultProjectId: null,
   defaultActivityId: null,

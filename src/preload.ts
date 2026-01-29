@@ -50,6 +50,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   openSettings: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_SETTINGS),
   openTimeEntry: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_TIME_ENTRY),
   closeWindow: () => ipcRenderer.invoke(IPC_CHANNELS.CLOSE_WINDOW),
+
+  // Events
+  onSettingsChanged: (callback: () => void) => {
+    ipcRenderer.on('settings-changed', callback);
+    return () => ipcRenderer.removeListener('settings-changed', callback);
+  },
 });
 
 // Type definitions for the exposed API
@@ -80,6 +86,7 @@ export interface ElectronAPI {
   openSettings: () => Promise<void>;
   openTimeEntry: () => Promise<void>;
   closeWindow: () => Promise<void>;
+  onSettingsChanged: (callback: () => void) => () => void;
 }
 
 declare global {

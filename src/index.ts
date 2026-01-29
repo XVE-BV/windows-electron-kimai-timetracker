@@ -551,6 +551,10 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.SAVE_SETTINGS, async (_, settings: AppSettings) => {
     saveSettings(settings);
     await updateTrayMenu();
+    // Notify tray window to refresh
+    if (trayWindow && !trayWindow.isDestroyed()) {
+      trayWindow.webContents.send('settings-changed');
+    }
     return { success: true };
   });
 

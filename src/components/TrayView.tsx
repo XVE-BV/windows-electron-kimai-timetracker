@@ -96,7 +96,8 @@ export function TrayView() {
       setAllProjects(projs);
       setConnectionStatus('connected');
 
-      if (state.projectId) {
+      if (state.isRunning && state.projectId) {
+        // Timer is running - load from timer state
         const proj = projs.find(p => p.id === state.projectId);
         setSelectedProject(proj || null);
 
@@ -113,6 +114,39 @@ export function TrayView() {
         if (state.activityId) {
           const act = acts.find(a => a.id === state.activityId);
           setSelectedActivity(act || null);
+        }
+      } else {
+        // Timer not running - load defaults from settings if enabled
+        const settings = await window.electronAPI.getSettings() as AppSettings;
+        if (settings.useDefaults) {
+          if (settings.defaultCustomerId) {
+            const cust = custs.find(c => c.id === settings.defaultCustomerId);
+            if (cust) {
+              setSelectedCustomer(cust);
+              setProjects(projs.filter(p => p.customer === cust.id));
+            }
+          }
+          if (settings.defaultProjectId) {
+            const proj = projs.find(p => p.id === settings.defaultProjectId);
+            setSelectedProject(proj || null);
+
+            if (proj) {
+              const acts = await window.electronAPI.kimaiGetActivities(settings.defaultProjectId) as KimaiActivity[];
+              setActivities(acts);
+
+              if (settings.defaultActivityId) {
+                const act = acts.find(a => a.id === settings.defaultActivityId);
+                setSelectedActivity(act || null);
+              }
+            }
+          }
+        } else {
+          // Defaults disabled - clear selections
+          setSelectedCustomer(null);
+          setSelectedProject(null);
+          setSelectedActivity(null);
+          setProjects([]);
+          setActivities([]);
         }
       }
 
@@ -180,9 +214,16 @@ export function TrayView() {
     loadData();
     const interval = setInterval(updateElapsedTime, 1000);
     const dataInterval = setInterval(loadData, 60000); // Refresh data every minute
+
+    // Listen for settings changes
+    const unsubscribe = window.electronAPI?.onSettingsChanged?.(() => {
+      loadData();
+    });
+
     return () => {
       clearInterval(interval);
       clearInterval(dataInterval);
+      unsubscribe?.();
     };
   }, [loadData]);
 
