@@ -444,6 +444,26 @@ export function TrayView() {
     setView('projects');
   };
 
+  const handleToggleFavoriteCustomer = async (customerId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!window.electronAPI) return;
+
+    const newFavorites = favoriteCustomerIds.includes(customerId)
+      ? favoriteCustomerIds.filter(id => id !== customerId)
+      : [...favoriteCustomerIds, customerId];
+
+    setFavoriteCustomerIds(newFavorites);
+
+    // Save to settings
+    try {
+      const settings = await window.electronAPI.getSettings();
+      settings.favoriteCustomerIds = newFavorites;
+      await window.electronAPI.saveSettings(settings);
+    } catch (error) {
+      console.error('Failed to save favorite:', error);
+    }
+  };
+
   const handleSelectProject = async (project: KimaiProject) => {
     if (!window.electronAPI) return;
     setSelectedProject(project);
@@ -680,17 +700,28 @@ export function TrayView() {
                     Favorites
                   </div>
                   {favoriteCustomers.map((customer) => (
-                    <button
+                    <div
                       key={customer.id}
-                      onClick={() => handleSelectCustomer(customer)}
-                      className={`w-full px-4 py-3 text-left hover:bg-accent flex items-center justify-between border-b border-border/50 ${selectedCustomer?.id === customer.id ? 'bg-accent' : ''}`}
+                      className={`w-full px-4 py-3 hover:bg-accent flex items-center justify-between border-b border-border/50 ${selectedCustomer?.id === customer.id ? 'bg-accent' : ''}`}
                     >
-                      <div className="flex items-center gap-2">
-                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                      <button
+                        onClick={() => handleSelectCustomer(customer)}
+                        className="flex items-center gap-2 flex-1 text-left"
+                      >
+                        <Users className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm">{customer.name}</span>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => handleToggleFavoriteCustomer(customer.id, e)}
+                          className="p-1 hover:bg-muted rounded"
+                          title="Remove from favorites"
+                        >
+                          <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        </button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
+                    </div>
                   ))}
                 </>
               )}
@@ -703,17 +734,28 @@ export function TrayView() {
                     </div>
                   )}
                   {otherCustomers.map((customer) => (
-                    <button
+                    <div
                       key={customer.id}
-                      onClick={() => handleSelectCustomer(customer)}
-                      className={`w-full px-4 py-3 text-left hover:bg-accent flex items-center justify-between border-b border-border/50 last:border-0 ${selectedCustomer?.id === customer.id ? 'bg-accent' : ''}`}
+                      className={`w-full px-4 py-3 hover:bg-accent flex items-center justify-between border-b border-border/50 last:border-0 ${selectedCustomer?.id === customer.id ? 'bg-accent' : ''}`}
                     >
-                      <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleSelectCustomer(customer)}
+                        className="flex items-center gap-2 flex-1 text-left"
+                      >
                         <Users className="h-4 w-4 text-muted-foreground" />
                         <span className="text-sm">{customer.name}</span>
+                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={(e) => handleToggleFavoriteCustomer(customer.id, e)}
+                          className="p-1 hover:bg-muted rounded"
+                          title="Add to favorites"
+                        >
+                          <Star className="h-4 w-4 text-muted-foreground" />
+                        </button>
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                    </button>
+                    </div>
                   ))}
                 </>
               )}
