@@ -1,64 +1,134 @@
-import React from 'react';
-import { ScrollText, X, Sparkles, Bug, Wrench } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { ScrollText, X, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 
-interface ChangelogEntry {
-  version: string;
-  date: string;
-  changes: {
-    type: 'feature' | 'fix' | 'improvement';
-    text: string;
-  }[];
+const GITHUB_REPO = 'XVE-BV/windows-electron-kimai-timetracker';
+
+interface GitHubRelease {
+  id: number;
+  tag_name: string;
+  name: string;
+  body: string;
+  published_at: string;
+  html_url: string;
 }
 
-const changelog: ChangelogEntry[] = [
-  {
-    version: '1.1.0',
-    date: '2026-01-29',
-    changes: [
-      { type: 'feature', text: 'Redesigned manual time entry with drill-down selection (Customer → Project → Activity)' },
-      { type: 'feature', text: 'Added search functionality to all selection views' },
-      { type: 'feature', text: 'Added Jira ticket linking to manual time entries with auto-match' },
-      { type: 'feature', text: 'Added toggle to override Jira auto-log per entry' },
-      { type: 'improvement', text: 'Start time now rounds to 15-minute intervals for Kimai compatibility' },
-      { type: 'improvement', text: 'Time inputs use 15-minute steps' },
-      { type: 'fix', text: 'Fixed "Object has been destroyed" error when closing tray window' },
-    ],
-  },
-  {
-    version: '1.0.0',
-    date: '2026-01-28',
-    changes: [
-      { type: 'feature', text: 'Initial release with Kimai time tracking integration' },
-      { type: 'feature', text: 'ActivityWatch integration for activity monitoring' },
-      { type: 'feature', text: 'Jira integration with automatic worklog posting' },
-      { type: 'feature', text: 'Work session tracking with reminders' },
-      { type: 'feature', text: 'System tray application with quick access' },
-      { type: 'feature', text: 'Customer → Project → Activity hierarchy' },
-      { type: 'feature', text: 'Default customer/project/activity settings' },
-    ],
-  },
-];
-
-const typeIcons = {
-  feature: Sparkles,
-  fix: Bug,
-  improvement: Wrench,
-};
-
-const typeColors = {
-  feature: 'text-green-500 bg-green-500/10',
-  fix: 'text-red-500 bg-red-500/10',
-  improvement: 'text-blue-500 bg-blue-500/10',
-};
-
-const typeLabels = {
-  feature: 'New',
-  fix: 'Fix',
-  improvement: 'Improved',
-};
-
 export function ChangelogView() {
+  const [releases, setReleases] = useState<GitHubRelease[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchReleases();
+  }, []);
+
+  const fetchReleases = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const response = await fetch(
+        `https://api.github.com/repos/${GITHUB_REPO}/releases`,
+        {
+          headers: {
+            Accept: 'application/vnd.github.v3+json',
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to fetch releases: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setReleases(data);
+    } catch (err) {
+      console.error('Failed to fetch releases:', err);
+      setError('Could not load changelog. Check your internet connection.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const formatDate = (dateStr: string): string => {
+    return new Date(dateStr).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+    });
+  };
+
+  // Simple markdown-like rendering for release body
+  const renderBody = (body: string) => {
+    if (!body) return <p className="text-sm text-muted-foreground">No release notes.</p>;
+
+    return body.split('\n').map((line, idx) => {
+      const trimmed = line.trim();
+
+      // Skip empty lines
+      if (!trimmed) return null;
+
+      // Headers (## What's Changed, etc.)
+      if (trimmed.startsWith('## ')) {
+        return (
+          <h4 key={idx} className="text-sm font-semibold mt-3 mb-1">
+            {trimmed.replace('## ', '')}
+          </h4>
+        );
+      }
+
+      // List items with links (* item by @user in url)
+      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
+        const content = trimmed.slice(2);
+        // Parse markdown links [text](url)
+        const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
+        const parts: React.ReactNode[] = [];
+        let lastIndex = 0;
+        let match;
+
+        while ((match = linkRegex.exec(content)) !== null) {
+          // Add text before the link
+          if (match.index > lastIndex) {
+            parts.push(content.slice(lastIndex, match.index));
+          }
+          // Add the link
+          const url = match[2];
+          parts.push(
+            <a
+              key={match.index}
+              href={url}
+              className="text-primary hover:underline cursor-pointer"
+              onClick={(e) => {
+                e.preventDefault();
+                window.electronAPI?.openExternal(url);
+              }}
+            >
+              {match[1]}
+            </a>
+          );
+          lastIndex = match.index + match[0].length;
+        }
+        // Add remaining text
+        if (lastIndex < content.length) {
+          parts.push(content.slice(lastIndex));
+        }
+
+        return (
+          <li key={idx} className="text-sm text-foreground/90 ml-4 list-disc">
+            {parts.length > 0 ? parts : content}
+          </li>
+        );
+      }
+
+      // Regular text
+      return (
+        <p key={idx} className="text-sm text-muted-foreground">
+          {trimmed}
+        </p>
+      );
+    });
+  };
+
   return (
     <div className="w-full bg-background overflow-hidden h-screen flex flex-col">
       {/* Header */}
@@ -82,30 +152,64 @@ export function ChangelogView() {
         </Button>
       </div>
 
-      {/* Changelog content */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-6">
-        {changelog.map((entry) => (
-          <div key={entry.version} className="space-y-3">
-            <div className="flex items-center gap-3">
-              <span className="text-lg font-bold text-primary">v{entry.version}</span>
-              <span className="text-sm text-muted-foreground">{entry.date}</span>
-            </div>
-            <div className="space-y-2 pl-2 border-l-2 border-border">
-              {entry.changes.map((change, idx) => {
-                const Icon = typeIcons[change.type];
-                return (
-                  <div key={idx} className="flex items-start gap-2 pl-3">
-                    <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${typeColors[change.type]}`}>
-                      <Icon className="h-3 w-3" />
-                      {typeLabels[change.type]}
-                    </span>
-                    <span className="text-sm text-foreground/90">{change.text}</span>
-                  </div>
-                );
-              })}
-            </div>
+      {/* Content */}
+      <div className="flex-1 overflow-y-auto p-4">
+        {loading && (
+          <div className="flex items-center justify-center py-12">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <span className="ml-2 text-sm text-muted-foreground">Loading releases...</span>
           </div>
-        ))}
+        )}
+
+        {error && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <AlertCircle className="h-8 w-8 text-muted-foreground mb-2" />
+            <p className="text-sm text-muted-foreground">{error}</p>
+            <Button variant="outline" size="sm" onClick={fetchReleases} className="mt-4">
+              Try again
+            </Button>
+          </div>
+        )}
+
+        {!loading && !error && releases.length === 0 && (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <p className="text-sm text-muted-foreground">No releases found.</p>
+          </div>
+        )}
+
+        {!loading && !error && releases.length > 0 && (
+          <div className="space-y-6">
+            {releases.map((release) => (
+              <div key={release.id} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-base font-bold text-primary">{release.tag_name}</span>
+                    {release.name && release.name !== release.tag_name && (
+                      <span className="text-sm text-muted-foreground">— {release.name}</span>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {formatDate(release.published_at)}
+                  </span>
+                </div>
+                <div className="pl-2 border-l-2 border-border space-y-1">
+                  {renderBody(release.body)}
+                </div>
+                <a
+                  href={release.html_url}
+                  className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-primary cursor-pointer"
+                  onClick={(e) => {
+                    e.preventDefault();
+                    window.electronAPI?.openExternal(release.html_url);
+                  }}
+                >
+                  <ExternalLink className="h-3 w-3" />
+                  View on GitHub
+                </a>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Footer */}

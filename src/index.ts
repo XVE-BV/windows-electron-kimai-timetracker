@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell } from 'electron';
 import * as path from 'path';
 import { kimaiAPI } from './services/kimai';
 import { activityWatchAPI } from './services/activitywatch';
@@ -648,6 +648,11 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.OPEN_CHANGELOG, () => {
     if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
     openChangelogWindow();
+  });
+  ipcMain.handle(IPC_CHANNELS.OPEN_EXTERNAL, (_, url: string) => {
+    if (url && (url.startsWith('https://') || url.startsWith('http://'))) {
+      shell.openExternal(url);
+    }
   });
   ipcMain.handle(IPC_CHANNELS.CLOSE_WINDOW, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);

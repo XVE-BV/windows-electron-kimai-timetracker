@@ -222,6 +222,7 @@ export const IPC_CHANNELS = {
   OPEN_SETTINGS: 'open-settings',
   OPEN_TIME_ENTRY: 'open-time-entry',
   OPEN_CHANGELOG: 'open-changelog',
+  OPEN_EXTERNAL: 'open-external',
   CLOSE_WINDOW: 'close-window',
 } as const;
 
