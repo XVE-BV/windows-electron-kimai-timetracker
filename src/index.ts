@@ -411,9 +411,9 @@ function createTrayWindow(): void {
   const { height: screenHeight } = primaryDisplay.workAreaSize;
 
   trayWindow = new BrowserWindow({
-    width: TRAY_WINDOW_WIDTH,
+    width: 600,
     height: screenHeight,
-    minWidth: TRAY_WINDOW_WIDTH,
+    minWidth: 400,
     minHeight: 400,
     show: false,
     resizable: true,
