@@ -114,15 +114,15 @@ export function SettingsView() {
   };
 
   const testKimaiConnection = async () => {
-    if (!window.electronAPI) return;
+    if (!window.electronAPI || !settings) return;
     setKimaiStatus('loading');
     setKimaiMessage('');
 
     // Save temporarily to test
     const tempSettings: AppSettings = {
-      ...settings!,
+      ...settings,
       kimai: { apiUrl: kimaiUrl, apiToken: kimaiToken },
-      jira: settings?.jira || { apiUrl: '', email: '', apiToken: '', enabled: false, autoLogWorklog: false },
+      jira: settings.jira || { apiUrl: '', email: '', apiToken: '', enabled: false, autoLogWorklog: false },
     };
     await window.electronAPI.saveSettings(tempSettings);
 
@@ -143,14 +143,14 @@ export function SettingsView() {
   };
 
   const testAwConnection = async () => {
-    if (!window.electronAPI) return;
+    if (!window.electronAPI || !settings) return;
     setAwStatus('loading');
     setAwMessage('');
 
     const tempSettings: AppSettings = {
-      ...settings!,
+      ...settings,
       activityWatch: { apiUrl: awUrl, enabled: awEnabled },
-      jira: settings?.jira || { apiUrl: '', email: '', apiToken: '', enabled: false, autoLogWorklog: false },
+      jira: settings.jira || { apiUrl: '', email: '', apiToken: '', enabled: false, autoLogWorklog: false },
     };
     await window.electronAPI.saveSettings(tempSettings);
 
@@ -166,12 +166,12 @@ export function SettingsView() {
   };
 
   const testJiraConnection = async () => {
-    if (!window.electronAPI) return;
+    if (!window.electronAPI || !settings) return;
     setJiraStatus('loading');
     setJiraMessage('');
 
     const tempSettings: AppSettings = {
-      ...settings!,
+      ...settings,
       jira: { apiUrl: jiraUrl, email: jiraEmail, apiToken: jiraToken, enabled: jiraEnabled, autoLogWorklog: jiraAutoLogWorklog },
     };
     await window.electronAPI.saveSettings(tempSettings);

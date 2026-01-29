@@ -13,7 +13,7 @@ interface ActivitySummary {
 class ActivityWatchAPI {
   // Cache buckets to avoid repeated lookups
   private bucketsCache: AWBuckets | null = null;
-  private bucketsCacheTime: number = 0;
+  private bucketsCacheTime = 0;
   private readonly CACHE_TTL_MS = 60000; // 1 minute
 
   private getBaseUrl(): string {
@@ -188,8 +188,8 @@ class ActivityWatchAPI {
       const title = data.title || 'Unknown';
       const key = `${app}|||${title}`;
 
-      if (aggregated.has(key)) {
-        const existing = aggregated.get(key)!;
+      const existing = aggregated.get(key);
+      if (existing) {
         existing.duration += event.duration;
       } else {
         aggregated.set(key, {

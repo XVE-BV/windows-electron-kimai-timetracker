@@ -7,7 +7,7 @@ import {
   KimaiTimesheet,
   KimaiTimesheetCreate,
 } from '../types';
-import { REQUEST_TIMEOUT_MS, KIMAI_MIN_DURATION_SECONDS } from '../constants';
+import { REQUEST_TIMEOUT_MS } from '../constants';
 import { NetworkError, AuthenticationError, TimeoutError, errorFromStatus } from '../errors';
 
 class KimaiAPI {

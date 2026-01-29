@@ -112,7 +112,7 @@ class JiraAPI {
     }
   }
 
-  async getMyIssues(maxResults: number = 20): Promise<JiraIssue[]> {
+  async getMyIssues(maxResults = 20): Promise<JiraIssue[]> {
     const jql = 'assignee = currentUser() AND status != Done ORDER BY updated DESC';
     // Include customfield_10278 (customer) and timetracking (estimates)
     const fields = 'summary,status,issuetype,priority,assignee,project,updated,created,customfield_10278,timetracking';
@@ -126,7 +126,7 @@ class JiraAPI {
     return result.issues;
   }
 
-  async searchIssues(jql: string, maxResults: number = 20): Promise<JiraIssue[]> {
+  async searchIssues(jql: string, maxResults = 20): Promise<JiraIssue[]> {
     const fields = 'summary,status,issuetype,priority,assignee,project,updated,created,customfield_10278,timetracking';
 
     // Use the new /search/jql endpoint (the old /search endpoint was deprecated)

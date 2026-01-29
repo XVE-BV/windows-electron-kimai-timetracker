@@ -21,14 +21,14 @@ export class NetworkError extends AppError {
 }
 
 export class AuthenticationError extends AppError {
-  constructor(message: string = 'Authentication failed') {
+  constructor(message = 'Authentication failed') {
     super(message, 'AUTH_ERROR', true);
     this.name = 'AuthenticationError';
   }
 }
 
 export class TimeoutError extends AppError {
-  constructor(message: string = 'Request timed out') {
+  constructor(message = 'Request timed out') {
     super(message, 'TIMEOUT_ERROR', true);
     this.name = 'TimeoutError';
   }

@@ -8,14 +8,13 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import {
-  AppSettings, KimaiProject, KimaiActivity, KimaiCustomer, JiraIssue
+  KimaiProject, KimaiActivity, KimaiCustomer, JiraIssue
 } from '../types';
 import { MAX_JIRA_ISSUES } from '../constants';
 
 type ViewType = 'main' | 'customers' | 'projects' | 'activities' | 'jira';
 
 export function TimeEntryView() {
-  const [settings, setSettings] = useState<AppSettings | null>(null);
   const [view, setView] = useState<ViewType>('main');
   const [saving, setSaving] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -78,7 +77,6 @@ export function TimeEntryView() {
 
     try {
       const s = await window.electronAPI.getSettings();
-      setSettings(s);
 
       if (s.kimai.apiUrl && s.kimai.apiToken) {
         // Load customers
