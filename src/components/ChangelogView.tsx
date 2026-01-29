@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { ScrollText, X, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
+import ReactMarkdown from 'react-markdown';
 
 interface GitHubRelease {
   id: number;
@@ -40,77 +41,6 @@ export function ChangelogView() {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
-    });
-  };
-
-  // Simple markdown-like rendering for release body
-  const renderBody = (body: string) => {
-    if (!body) return <p className="text-sm text-muted-foreground">No release notes.</p>;
-
-    return body.split('\n').map((line, idx) => {
-      const trimmed = line.trim();
-
-      // Skip empty lines
-      if (!trimmed) return null;
-
-      // Headers (## What's Changed, etc.)
-      if (trimmed.startsWith('## ')) {
-        return (
-          <h4 key={idx} className="text-sm font-semibold mt-3 mb-1">
-            {trimmed.replace('## ', '')}
-          </h4>
-        );
-      }
-
-      // List items with links (* item by @user in url)
-      if (trimmed.startsWith('* ') || trimmed.startsWith('- ')) {
-        const content = trimmed.slice(2);
-        // Parse markdown links [text](url)
-        const linkRegex = /\[([^\]]+)\]\(([^)]+)\)/g;
-        const parts: React.ReactNode[] = [];
-        let lastIndex = 0;
-        let match;
-
-        while ((match = linkRegex.exec(content)) !== null) {
-          // Add text before the link
-          if (match.index > lastIndex) {
-            parts.push(content.slice(lastIndex, match.index));
-          }
-          // Add the link
-          const url = match[2];
-          parts.push(
-            <a
-              key={match.index}
-              href={url}
-              className="text-primary hover:underline cursor-pointer"
-              onClick={(e) => {
-                e.preventDefault();
-                window.electronAPI?.openExternal(url);
-              }}
-            >
-              {match[1]}
-            </a>
-          );
-          lastIndex = match.index + match[0].length;
-        }
-        // Add remaining text
-        if (lastIndex < content.length) {
-          parts.push(content.slice(lastIndex));
-        }
-
-        return (
-          <li key={idx} className="text-sm text-foreground/90 ml-4 list-disc">
-            {parts.length > 0 ? parts : content}
-          </li>
-        );
-      }
-
-      // Regular text
-      return (
-        <p key={idx} className="text-sm text-muted-foreground">
-          {trimmed}
-        </p>
-      );
     });
   };
 
@@ -177,8 +107,37 @@ export function ChangelogView() {
                     {formatDate(release.published_at)}
                   </span>
                 </div>
-                <div className="pl-2 border-l-2 border-border space-y-1">
-                  {renderBody(release.body)}
+                <div className="pl-3 border-l-2 border-border prose prose-sm dark:prose-invert max-w-none">
+                  <ReactMarkdown
+                    components={{
+                      h1: ({ children }) => <h3 className="text-base font-bold mt-3 mb-1">{children}</h3>,
+                      h2: ({ children }) => <h4 className="text-sm font-bold mt-3 mb-1">{children}</h4>,
+                      h3: ({ children }) => <h5 className="text-sm font-semibold mt-2 mb-1">{children}</h5>,
+                      p: ({ children }) => <p className="text-sm text-foreground/90 my-1">{children}</p>,
+                      ul: ({ children }) => <ul className="list-disc list-inside space-y-0.5 my-1">{children}</ul>,
+                      ol: ({ children }) => <ol className="list-decimal list-inside space-y-0.5 my-1">{children}</ol>,
+                      li: ({ children }) => <li className="text-sm text-foreground/90">{children}</li>,
+                      a: ({ href, children }) => (
+                        <a
+                          href={href}
+                          className="text-primary hover:underline cursor-pointer"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            if (href) window.electronAPI?.openExternal(href);
+                          }}
+                        >
+                          {children}
+                        </a>
+                      ),
+                      strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+                      em: ({ children }) => <em className="italic">{children}</em>,
+                      code: ({ children }) => (
+                        <code className="px-1 py-0.5 bg-muted rounded text-xs">{children}</code>
+                      ),
+                    }}
+                  >
+                    {release.body || 'No release notes.'}
+                  </ReactMarkdown>
                 </div>
                 <a
                   href={release.html_url}
