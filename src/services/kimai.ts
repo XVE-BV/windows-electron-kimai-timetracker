@@ -178,8 +178,14 @@ class KimaiAPI {
   }
 
   async stopTimer(timesheetId: number): Promise<KimaiTimesheet> {
-    // Just stop - Kimai handles rounding and minimum duration
-    return this.stopTimesheet(timesheetId);
+    // Round end time to nearest 15-minute interval
+    const now = new Date();
+    const roundedMinutes = Math.round(now.getMinutes() / 15) * 15;
+    now.setMinutes(roundedMinutes, 0, 0);
+    // Handle overflow when rounding 53-59 minutes → 60 → next hour
+    const end = this.formatDateTime(now);
+
+    return this.updateTimesheet(timesheetId, { end });
   }
 
   async updateTimesheet(id: number, data: Partial<KimaiTimesheetCreate> & { end?: string }): Promise<KimaiTimesheet> {
