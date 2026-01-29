@@ -37,6 +37,7 @@ let mainWindow: BrowserWindow | null = null;
 let trayWindow: BrowserWindow | null = null;
 let settingsWindow: BrowserWindow | null = null;
 let timeEntryWindow: BrowserWindow | null = null;
+let changelogWindow: BrowserWindow | null = null;
 
 // Cache for projects and activities
 let cachedProjects: KimaiProject[] = [];
@@ -481,6 +482,35 @@ function openTimeEntryWindow(): void {
   });
 }
 
+function openChangelogWindow(): void {
+  if (changelogWindow && !changelogWindow.isDestroyed()) {
+    changelogWindow.focus();
+    return;
+  }
+
+  changelogWindow = new BrowserWindow({
+    width: 450,
+    height: 500,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    title: 'Changelog',
+    icon: createTrayIcon(),
+    webPreferences: {
+      preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
+      contextIsolation: true,
+      nodeIntegration: false,
+    },
+  });
+
+  changelogWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#changelog`);
+  changelogWindow.setMenu(null);
+
+  changelogWindow.on('closed', () => {
+    changelogWindow = null;
+  });
+}
+
 async function openActivitySummary(): Promise<void> {
   const settings = getSettings();
   if (!settings.activityWatch.enabled) {
@@ -614,6 +644,10 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.OPEN_TIME_ENTRY, () => {
     if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
     openTimeEntryWindow();
+  });
+  ipcMain.handle(IPC_CHANNELS.OPEN_CHANGELOG, () => {
+    if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
+    openChangelogWindow();
   });
   ipcMain.handle(IPC_CHANNELS.CLOSE_WINDOW, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
