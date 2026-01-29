@@ -207,7 +207,36 @@ export function TrayView() {
   const handleStartStop = async () => {
     if (!window.electronAPI) return;
     if (timerState?.isRunning) {
+      // Store Jira issue before clearing state
+      const jiraIssueToLog = selectedJiraIssue;
+      const timerStartTime = timerState.startTime;
+
       await window.electronAPI.kimaiStopTimer();
+
+      // Log to Jira if a ticket was linked
+      if (jiraIssueToLog && timerStartTime && jiraEnabled) {
+        try {
+          const startDate = new Date(timerStartTime);
+          const endDate = new Date();
+          let durationSeconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000);
+
+          // Enforce minimum 15 minutes (same as Kimai)
+          if (durationSeconds < 900) {
+            durationSeconds = 900;
+          }
+
+          await window.electronAPI.jiraAddWorklog(
+            jiraIssueToLog.key,
+            durationSeconds,
+            startDate.toISOString(),
+            description || undefined
+          );
+          console.log(`Logged ${durationSeconds}s to Jira ${jiraIssueToLog.key}`);
+        } catch (error) {
+          console.error('Failed to log to Jira:', error);
+        }
+      }
+
       setDescription(''); // Clear description after stopping
       setSelectedJiraIssue(null); // Clear Jira issue after stopping
     } else if (selectedProject && selectedActivity) {
@@ -607,6 +636,11 @@ export function TrayView() {
                     <span className="text-xs px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
                       {issue.fields.status.name}
                     </span>
+                    {issue.fields.timetracking?.originalEstimate && (
+                      <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 text-blue-700">
+                        {issue.fields.timetracking.originalEstimate}
+                      </span>
+                    )}
                   </div>
                   <div className="text-sm truncate mt-0.5">{issue.fields.summary}</div>
                 </div>
@@ -757,21 +791,33 @@ export function TrayView() {
         {jiraEnabled && (
           <div className="mt-1">
             {selectedJiraIssue ? (
-              <div className="px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-md flex items-center justify-between">
-                <div className="flex items-center gap-2 min-w-0 flex-1">
-                  <Ticket className="h-4 w-4 text-blue-500 flex-shrink-0" />
-                  <div className="min-w-0 flex-1">
-                    <span className="text-xs font-mono font-medium text-blue-600">{selectedJiraIssue.key}</span>
-                    <span className="text-xs text-muted-foreground ml-2 truncate">{selectedJiraIssue.fields.summary}</span>
+              <div className="px-3 py-2 bg-blue-500/10 border border-blue-500/30 rounded-md">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2 min-w-0 flex-1">
+                    <Ticket className="h-4 w-4 text-blue-500 flex-shrink-0" />
+                    <div className="min-w-0 flex-1">
+                      <span className="text-xs font-mono font-medium text-blue-600">{selectedJiraIssue.key}</span>
+                      <span className="text-xs text-muted-foreground ml-2 truncate">{selectedJiraIssue.fields.summary}</span>
+                    </div>
                   </div>
+                  <button
+                    onClick={clearJiraIssue}
+                    disabled={timerState?.isRunning}
+                    className="p-1 hover:bg-muted rounded disabled:opacity-50"
+                  >
+                    <X className="h-3 w-3 text-muted-foreground" />
+                  </button>
                 </div>
-                <button
-                  onClick={clearJiraIssue}
-                  disabled={timerState?.isRunning}
-                  className="p-1 hover:bg-muted rounded disabled:opacity-50"
-                >
-                  <X className="h-3 w-3 text-muted-foreground" />
-                </button>
+                {selectedJiraIssue.fields.timetracking?.originalEstimate && (
+                  <div className="mt-1 text-xs text-muted-foreground flex items-center gap-2">
+                    <Timer className="h-3 w-3" />
+                    <span>Estimate: {selectedJiraIssue.fields.timetracking.originalEstimate}</span>
+                    {selectedJiraIssue.fields.timetracking.remainingEstimate &&
+                      selectedJiraIssue.fields.timetracking.remainingEstimate !== selectedJiraIssue.fields.timetracking.originalEstimate && (
+                      <span className="text-yellow-600">({selectedJiraIssue.fields.timetracking.remainingEstimate} remaining)</span>
+                    )}
+                  </div>
+                )}
               </div>
             ) : (
               <button

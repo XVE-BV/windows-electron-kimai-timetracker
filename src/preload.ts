@@ -32,6 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   jiraGetMyIssues: (maxResults?: number) => ipcRenderer.invoke(IPC_CHANNELS.JIRA_GET_MY_ISSUES, maxResults),
   jiraSearchIssues: (jql: string, maxResults?: number) =>
     ipcRenderer.invoke(IPC_CHANNELS.JIRA_SEARCH_ISSUES, jql, maxResults),
+  jiraAddWorklog: (issueKey: string, timeSpentSeconds: number, started: string, comment?: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.JIRA_ADD_WORKLOG, issueKey, timeSpentSeconds, started, comment),
 
   // Timer State
   getTimerState: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TIMER_STATE),
@@ -60,6 +62,7 @@ export interface ElectronAPI {
   jiraTestConnection: () => Promise<{ success: boolean; message: string }>;
   jiraGetMyIssues: (maxResults?: number) => Promise<unknown[]>;
   jiraSearchIssues: (jql: string, maxResults?: number) => Promise<unknown[]>;
+  jiraAddWorklog: (issueKey: string, timeSpentSeconds: number, started: string, comment?: string) => Promise<{ id: string }>;
   getTimerState: () => Promise<unknown>;
   openSettings: () => Promise<void>;
   openTimeEntry: () => Promise<void>;

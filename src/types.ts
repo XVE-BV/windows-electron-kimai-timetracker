@@ -115,6 +115,14 @@ export interface JiraIssue {
     };
     updated: string;
     created: string;
+    // Time tracking fields
+    timetracking?: {
+      originalEstimate?: string;
+      remainingEstimate?: string;
+      originalEstimateSeconds?: number;
+      remainingEstimateSeconds?: number;
+      timeSpentSeconds?: number;
+    };
     // Custom field for customer (xve specific - customfield_10278)
     customfield_10278?: {
       value: string;
@@ -181,6 +189,7 @@ export const IPC_CHANNELS = {
   JIRA_TEST_CONNECTION: 'jira-test-connection',
   JIRA_GET_MY_ISSUES: 'jira-get-my-issues',
   JIRA_SEARCH_ISSUES: 'jira-search-issues',
+  JIRA_ADD_WORKLOG: 'jira-add-worklog',
 
   // Timer
   GET_TIMER_STATE: 'get-timer-state',

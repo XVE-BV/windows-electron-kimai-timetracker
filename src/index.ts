@@ -37,25 +37,37 @@ const TRAY_WINDOW_WIDTH = 380;
 const TRAY_WINDOW_HEIGHT = 600;
 
 function createTrayIcon(): Electron.NativeImage {
-  // Create a simple tray icon (16x16 for Windows)
-  // In production, you'd use a proper .ico file
-  const iconPath = path.join(__dirname, '..', 'assets', 'tray-icon.png');
+  const fs = require('fs');
 
-  // Try to load the icon, fallback to a simple generated one
-  try {
-    return nativeImage.createFromPath(iconPath);
-  } catch {
-    // Create a simple colored square as fallback
-    const size = 16;
-    const buffer = Buffer.alloc(size * size * 4);
-    for (let i = 0; i < size * size; i++) {
-      buffer[i * 4] = 66;     // R
-      buffer[i * 4 + 1] = 133; // G
-      buffer[i * 4 + 2] = 244; // B
-      buffer[i * 4 + 3] = 255; // A
+  // Try multiple paths for development and production
+  const possiblePaths = [
+    path.join(__dirname, 'assets', 'favicon.ico'),        // Webpack dev build
+    path.join(__dirname, '..', 'assets', 'favicon.ico'),  // Alternative dev path
+    path.join(process.resourcesPath, 'assets', 'favicon.ico'),  // Production (extraResource)
+    path.join(app.getAppPath(), 'src', 'assets', 'favicon.ico'),  // App path
+  ];
+
+  for (const iconPath of possiblePaths) {
+    try {
+      if (fs.existsSync(iconPath)) {
+        return nativeImage.createFromPath(iconPath);
+      }
+    } catch (error) {
+      // Try next path
     }
-    return nativeImage.createFromBuffer(buffer, { width: size, height: size });
   }
+
+  console.warn('Could not load tray icon, using fallback');
+  // Fallback to a simple colored square
+  const size = 16;
+  const buffer = Buffer.alloc(size * size * 4);
+  for (let i = 0; i < size * size; i++) {
+    buffer[i * 4] = 66;     // R
+    buffer[i * 4 + 1] = 133; // G
+    buffer[i * 4 + 2] = 244; // B
+    buffer[i * 4 + 3] = 255; // A
+  }
+  return nativeImage.createFromBuffer(buffer, { width: size, height: size });
 }
 
 function formatDuration(seconds: number): string {
@@ -501,6 +513,9 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.JIRA_GET_MY_ISSUES, (_, maxResults?: number) => jiraAPI.getMyIssues(maxResults));
   ipcMain.handle(IPC_CHANNELS.JIRA_SEARCH_ISSUES, (_, jql: string, maxResults?: number) =>
     jiraAPI.searchIssues(jql, maxResults)
+  );
+  ipcMain.handle(IPC_CHANNELS.JIRA_ADD_WORKLOG, (_, issueKey: string, timeSpentSeconds: number, started: string, comment?: string) =>
+    jiraAPI.addWorklog(issueKey, timeSpentSeconds, new Date(started), comment)
   );
 
   // Timer State

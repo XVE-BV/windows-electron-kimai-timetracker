@@ -86,8 +86,8 @@ class JiraAPI {
 
   async getMyIssues(maxResults: number = 20): Promise<JiraIssue[]> {
     const jql = 'assignee = currentUser() AND status != Done ORDER BY updated DESC';
-    // Include customfield_10278 which contains customer info
-    const fields = 'summary,status,issuetype,priority,assignee,project,updated,created,customfield_10278';
+    // Include customfield_10278 (customer) and timetracking (estimates)
+    const fields = 'summary,status,issuetype,priority,assignee,project,updated,created,customfield_10278,timetracking';
 
     // Use the new /search/jql endpoint (the old /search endpoint was deprecated)
     const result = await this.request<JiraSearchResult>(
@@ -99,7 +99,7 @@ class JiraAPI {
   }
 
   async searchIssues(jql: string, maxResults: number = 20): Promise<JiraIssue[]> {
-    const fields = 'summary,status,issuetype,priority,assignee,project,updated,created';
+    const fields = 'summary,status,issuetype,priority,assignee,project,updated,created,customfield_10278,timetracking';
 
     // Use the new /search/jql endpoint (the old /search endpoint was deprecated)
     const result = await this.request<JiraSearchResult>(
@@ -108,6 +108,37 @@ class JiraAPI {
     );
 
     return result.issues;
+  }
+
+  async addWorklog(
+    issueKey: string,
+    timeSpentSeconds: number,
+    started: Date,
+    comment?: string
+  ): Promise<{ id: string }> {
+    const body: {
+      timeSpentSeconds: number;
+      started: string;
+      comment?: { type: string; version: number; content: { type: string; content: { type: string; text: string }[] }[] };
+    } = {
+      timeSpentSeconds,
+      started: started.toISOString().replace('Z', '+0000'),
+    };
+
+    if (comment) {
+      body.comment = {
+        type: 'doc',
+        version: 1,
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'text', text: comment }],
+          },
+        ],
+      };
+    }
+
+    return this.request<{ id: string }>('POST', `/issue/${issueKey}/worklog`, body);
   }
 }
 
