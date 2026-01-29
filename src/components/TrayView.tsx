@@ -406,14 +406,12 @@ export function TrayView() {
 
   const handleSelectJiraIssue = async (issue: JiraIssue) => {
     setSelectedJiraIssue(issue);
-    // Prefill description if empty
-    if (!description) {
-      setDescription(`${issue.key}: ${issue.fields.summary}`);
-    }
+    // Always set description from Jira ticket
+    setDescription(`${issue.key}: ${issue.fields.summary}`);
     setJiraSearchQuery('');
 
-    // Auto-select customer if none selected
-    if (!selectedCustomer && customers.length > 0) {
+    // Always try to match and set customer/project/activity from Jira ticket
+    if (customers.length > 0) {
       // Try to match customfield_10278 (customer field) first
       const jiraCustomerName = (issue.fields.customfield_10278 as { value?: string } | undefined)?.value;
       const jiraProjectName = issue.fields.project?.name;
@@ -448,7 +446,7 @@ export function TrayView() {
         matchedCustomer = findBestMatch(jiraProjectName);
       }
 
-      // Auto-select the matched customer and load projects
+      // Set the matched customer and load projects
       if (matchedCustomer) {
         setSelectedCustomer(matchedCustomer);
         const filteredProjects = allProjects.filter(p => p.customer === matchedCustomer.id);
@@ -465,15 +463,39 @@ export function TrayView() {
               const acts = await window.electronAPI.kimaiGetActivities(proj.id);
               setActivities(acts);
 
-              // Auto-select first activity if only one available
+              // Auto-select activity: prefer "werk"/"work", otherwise first if only one
               if (acts.length === 1) {
                 setSelectedActivity(acts[0]);
+              } else if (acts.length > 1) {
+                // Try to find a "work" activity
+                const workActivity = acts.find(a =>
+                  a.name.toLowerCase() === 'werk' ||
+                  a.name.toLowerCase() === 'work' ||
+                  a.name.toLowerCase().includes('werk') ||
+                  a.name.toLowerCase().includes('work')
+                );
+                setSelectedActivity(workActivity || null);
+              } else {
+                setSelectedActivity(null);
               }
             } catch (error) {
               console.error('Failed to load activities:', error);
+              setActivities([]);
+              setSelectedActivity(null);
             }
           }
+        } else {
+          setSelectedProject(null);
+          setSelectedActivity(null);
+          setActivities([]);
         }
+      } else {
+        // No matching customer found - clear selections
+        setSelectedCustomer(null);
+        setSelectedProject(null);
+        setSelectedActivity(null);
+        setProjects([]);
+        setActivities([]);
       }
     }
 
