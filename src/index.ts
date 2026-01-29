@@ -397,10 +397,14 @@ function createTrayWindow(): void {
 
   trayWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#tray`);
   trayWindow.setMenu(null);
+
+  trayWindow.on('closed', () => {
+    trayWindow = null;
+  });
 }
 
 function toggleTrayWindow(): void {
-  if (!trayWindow) {
+  if (!trayWindow || trayWindow.isDestroyed()) {
     createTrayWindow();
   }
 
@@ -604,11 +608,11 @@ function setupIPC(): void {
 
   // Window
   ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, () => {
-    if (trayWindow) trayWindow.hide();
+    if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
     openSettingsWindow();
   });
   ipcMain.handle(IPC_CHANNELS.OPEN_TIME_ENTRY, () => {
-    if (trayWindow) trayWindow.hide();
+    if (trayWindow && !trayWindow.isDestroyed()) trayWindow.hide();
     openTimeEntryWindow();
   });
   ipcMain.handle(IPC_CHANNELS.CLOSE_WINDOW, (event) => {

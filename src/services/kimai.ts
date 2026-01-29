@@ -164,6 +164,9 @@ class KimaiAPI {
     description?: string
   ): Promise<KimaiTimesheet> {
     const now = new Date();
+    // Round down to nearest 15-minute interval
+    const roundedMinutes = Math.floor(now.getMinutes() / 15) * 15;
+    now.setMinutes(roundedMinutes, 0, 0);
     const begin = this.formatDateTime(now);
 
     return this.createTimesheet({
@@ -175,22 +178,8 @@ class KimaiAPI {
   }
 
   async stopTimer(timesheetId: number): Promise<KimaiTimesheet> {
-    // Stop the timer first
-    const stoppedTimesheet = await this.stopTimesheet(timesheetId);
-
-    // Enforce minimum duration
-    if (stoppedTimesheet.duration < KIMAI_MIN_DURATION_SECONDS) {
-      // Calculate new end time: begin + minimum duration
-      const beginDate = new Date(stoppedTimesheet.begin);
-      const newEndDate = new Date(beginDate.getTime() + KIMAI_MIN_DURATION_SECONDS * 1000);
-
-      // Update the timesheet with new end time
-      return this.updateTimesheet(timesheetId, {
-        end: this.formatDateTime(newEndDate),
-      });
-    }
-
-    return stoppedTimesheet;
+    // Just stop - Kimai handles rounding and minimum duration
+    return this.stopTimesheet(timesheetId);
   }
 
   async updateTimesheet(id: number, data: Partial<KimaiTimesheetCreate> & { end?: string }): Promise<KimaiTimesheet> {
