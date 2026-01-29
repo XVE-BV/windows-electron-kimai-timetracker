@@ -628,8 +628,9 @@ function setupIPC(): void {
     const currentPid = process.pid;
 
     return new Promise((resolve) => {
-      // Use PowerShell to find all Kimai Time Tracker processes
-      const cmd = `powershell -Command "Get-Process | Where-Object {$_.ProcessName -match 'kimai|electron'} | Select-Object Id,ProcessName,WorkingSet64 | ConvertTo-Json"`;
+      // Use WMI to get processes with command lines - filter for main processes only
+      // Electron child processes have --type= in their command line (renderer, gpu, utility, etc.)
+      const cmd = `powershell -Command "Get-CimInstance Win32_Process | Where-Object {$_.Name -match 'kimai|electron'} | Select-Object ProcessId,Name,WorkingSetSize,CommandLine | ConvertTo-Json"`;
 
       exec(cmd, (error: Error | null, stdout: string) => {
         if (error) {
@@ -646,15 +647,28 @@ function setupIPC(): void {
           }
 
           const result = processes
-            .filter((p: { ProcessName: string }) =>
-              p.ProcessName?.toLowerCase().includes('kimai') ||
-              p.ProcessName?.toLowerCase() === 'electron'
-            )
-            .map((p: { Id: number; ProcessName: string; WorkingSet64: number }) => ({
-              pid: p.Id,
-              name: p.ProcessName,
-              memory: p.WorkingSet64 || 0,
-              isCurrent: p.Id === currentPid,
+            .filter((p: { Name: string; CommandLine: string | null }) => {
+              const name = p.Name?.toLowerCase() || '';
+              const cmdLine = p.CommandLine || '';
+
+              // Must be electron or kimai process
+              if (!name.includes('kimai') && name !== 'electron.exe') {
+                return false;
+              }
+
+              // Filter out Electron child processes (they have --type= argument)
+              // Main processes don't have this
+              if (cmdLine.includes('--type=')) {
+                return false;
+              }
+
+              return true;
+            })
+            .map((p: { ProcessId: number; Name: string; WorkingSetSize: number }) => ({
+              pid: p.ProcessId,
+              name: p.Name,
+              memory: p.WorkingSetSize || 0,
+              isCurrent: p.ProcessId === currentPid,
             }));
 
           resolve(result);
