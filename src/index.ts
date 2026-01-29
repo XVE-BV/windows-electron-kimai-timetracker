@@ -415,11 +415,10 @@ function createTrayWindow(): void {
     height: screenHeight,
     minWidth: TRAY_WINDOW_WIDTH,
     minHeight: 400,
-    maxWidth: 600,
     show: false,
     resizable: true,
     minimizable: true,
-    maximizable: false,
+    maximizable: true,
     title: 'Kimai Time Tracker',
     icon: createTrayIcon(),
     webPreferences: {
