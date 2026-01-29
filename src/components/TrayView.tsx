@@ -483,15 +483,26 @@ export function TrayView() {
         const filteredProjects = allProjects.filter(p => p.customer === matchedCustomer.id);
         setProjects(filteredProjects);
 
-        // Auto-select first project if only one available
+        // Auto-select project: prefer "Regiewerk", otherwise first if only one
+        let selectedProj: KimaiProject | null = null;
         if (filteredProjects.length === 1) {
-          const proj = filteredProjects[0];
-          setSelectedProject(proj);
+          selectedProj = filteredProjects[0];
+        } else if (filteredProjects.length > 1) {
+          // Try to find "Regiewerk" project
+          const regiewerkProject = filteredProjects.find(p =>
+            p.name.toLowerCase() === 'regiewerk' ||
+            p.name.toLowerCase().includes('regiewerk')
+          );
+          selectedProj = regiewerkProject || null;
+        }
+
+        if (selectedProj) {
+          setSelectedProject(selectedProj);
 
           // Load activities for this project
           if (window.electronAPI) {
             try {
-              const acts = await window.electronAPI.kimaiGetActivities(proj.id);
+              const acts = await window.electronAPI.kimaiGetActivities(selectedProj.id);
               setActivities(acts);
 
               // Auto-select activity: prefer "werk"/"work", otherwise first if only one
