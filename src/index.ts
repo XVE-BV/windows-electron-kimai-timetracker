@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell, net } from 'electron';
 import * as path from 'path';
 import { kimaiAPI } from './services/kimai';
 import { activityWatchAPI } from './services/activitywatch';
@@ -657,6 +657,50 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.CLOSE_WINDOW, (event) => {
     const win = BrowserWindow.fromWebContents(event.sender);
     if (win) win.close();
+  });
+
+  // GitHub
+  ipcMain.handle(IPC_CHANNELS.GITHUB_GET_RELEASES, async () => {
+    const repo = 'XVE-BV/windows-electron-kimai-timetracker';
+    return new Promise((resolve, reject) => {
+      const request = net.request({
+        method: 'GET',
+        url: `https://api.github.com/repos/${repo}/releases`,
+      });
+
+      request.setHeader('Accept', 'application/vnd.github.v3+json');
+      request.setHeader('User-Agent', 'KimaiTimeTracker');
+
+      let responseData = '';
+
+      request.on('response', (response) => {
+        response.on('data', (chunk) => {
+          responseData += chunk.toString();
+        });
+
+        response.on('end', () => {
+          if (response.statusCode === 200) {
+            try {
+              resolve(JSON.parse(responseData));
+            } catch {
+              reject(new Error('Failed to parse response'));
+            }
+          } else {
+            reject(new Error(`GitHub API error: ${response.statusCode}`));
+          }
+        });
+
+        response.on('error', (error) => {
+          reject(error);
+        });
+      });
+
+      request.on('error', (error) => {
+        reject(error);
+      });
+
+      request.end();
+    });
   });
 }
 

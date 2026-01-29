@@ -2,8 +2,6 @@ import React, { useEffect, useState } from 'react';
 import { ScrollText, X, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
 import { Button } from './ui/button';
 
-const GITHUB_REPO = 'XVE-BV/windows-electron-kimai-timetracker';
-
 interface GitHubRelease {
   id: number;
   tag_name: string;
@@ -27,20 +25,7 @@ export function ChangelogView() {
     setError(null);
 
     try {
-      const response = await fetch(
-        `https://api.github.com/repos/${GITHUB_REPO}/releases`,
-        {
-          headers: {
-            Accept: 'application/vnd.github.v3+json',
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch releases: ${response.status}`);
-      }
-
-      const data = await response.json();
+      const data = await window.electronAPI.githubGetReleases();
       setReleases(data);
     } catch (err) {
       console.error('Failed to fetch releases:', err);

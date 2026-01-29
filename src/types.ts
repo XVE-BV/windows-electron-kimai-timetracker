@@ -224,6 +224,9 @@ export const IPC_CHANNELS = {
   OPEN_CHANGELOG: 'open-changelog',
   OPEN_EXTERNAL: 'open-external',
   CLOSE_WINDOW: 'close-window',
+
+  // GitHub
+  GITHUB_GET_RELEASES: 'github-get-releases',
 } as const;
 
 // Default Settings
