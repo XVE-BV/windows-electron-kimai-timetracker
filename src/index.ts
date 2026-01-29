@@ -382,12 +382,10 @@ function createTrayWindow(): void {
     width: TRAY_WINDOW_WIDTH,
     height: TRAY_WINDOW_HEIGHT,
     show: false,
-    frame: false,
-    fullscreenable: false,
     resizable: false,
-    transparent: true,
-    alwaysOnTop: true,
-    skipTaskbar: true,
+    minimizable: false,
+    maximizable: false,
+    title: 'Kimai Time Tracker',
     webPreferences: {
       preload: MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY,
       contextIsolation: true,
@@ -398,13 +396,6 @@ function createTrayWindow(): void {
 
   trayWindow.loadURL(`${MAIN_WINDOW_WEBPACK_ENTRY}#tray`);
   trayWindow.setMenu(null);
-
-  // Hide when focus is lost
-  trayWindow.on('blur', () => {
-    if (trayWindow && !trayWindow.webContents.isDevToolsOpened()) {
-      trayWindow.hide();
-    }
-  });
 }
 
 function calculateTrayWindowPosition(): { x: number; y: number } {

@@ -555,7 +555,7 @@ export function TrayView() {
   // Customers list view with search
   if (view === 'customers') {
     return (
-      <div className="w-full bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
+      <div className="w-full bg-background overflow-hidden">
         <div className="p-3 border-b border-border bg-muted/30">
           <button
             onClick={() => { setView('main'); setSearchQuery(''); }}
@@ -614,7 +614,7 @@ export function TrayView() {
   // Projects list view with search
   if (view === 'projects') {
     return (
-      <div className="w-full bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
+      <div className="w-full bg-background overflow-hidden">
         <div className="p-3 border-b border-border bg-muted/30">
           <button
             onClick={() => { setView('customers'); setSearchQuery(''); }}
@@ -676,7 +676,7 @@ export function TrayView() {
   // Activities list view with search
   if (view === 'activities') {
     return (
-      <div className="w-full bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
+      <div className="w-full bg-background overflow-hidden">
         <div className="p-3 border-b border-border bg-muted/30">
           <button
             onClick={() => { setView('projects'); setSearchQuery(''); }}
@@ -738,7 +738,7 @@ export function TrayView() {
   // Jira issues list view with search
   if (view === 'jira') {
     return (
-      <div className="w-full bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
+      <div className="w-full bg-background overflow-hidden">
         <div className="p-3 border-b border-border bg-muted/30">
           <button
             onClick={() => { setView('main'); setJiraSearchQuery(''); }}
@@ -809,7 +809,7 @@ export function TrayView() {
 
   // Main view - comprehensive
   return (
-    <div className="w-full bg-background border border-border rounded-lg shadow-2xl overflow-hidden">
+    <div className="w-full bg-background overflow-hidden">
       {/* Error Toast */}
       {errorMessage && (
         <div className="px-3 py-2 bg-red-500/10 border-b border-red-500/30 flex items-center justify-between gap-2">
