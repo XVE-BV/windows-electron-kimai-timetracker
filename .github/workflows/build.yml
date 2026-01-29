@@ -49,9 +49,17 @@ jobs:
         shell: pwsh
         run: |
           $version = "${{ steps.version.outputs.version }}"
+          # Copy installer
           Get-ChildItem -Path out/make -Recurse -Filter "*.exe" | ForEach-Object {
             $newName = "KimaiTimeTracker-$version-Windows-Setup.exe"
             Copy-Item $_.FullName -Destination "out/make/$newName"
+          }
+          # Copy nupkg and RELEASES for auto-updater
+          Get-ChildItem -Path out/make -Recurse -Filter "*.nupkg" | ForEach-Object {
+            Copy-Item $_.FullName -Destination "out/make/$($_.Name)"
+          }
+          Get-ChildItem -Path out/make -Recurse -Filter "RELEASES" | ForEach-Object {
+            Copy-Item $_.FullName -Destination "out/make/RELEASES"
           }
 
       - name: Rename artifacts (macOS)
@@ -74,6 +82,8 @@ jobs:
           name: ${{ matrix.platform }}-build
           path: |
             out/make/KimaiTimeTracker-*
+            out/make/*.nupkg
+            out/make/RELEASES
           if-no-files-found: ignore
 
   release:
