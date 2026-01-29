@@ -30,6 +30,7 @@ function mergeSettings(stored: Partial<AppSettings> | null | undefined): AppSett
     defaultProjectId: stored.defaultProjectId ?? DEFAULT_SETTINGS.defaultProjectId,
     defaultActivityId: stored.defaultActivityId ?? DEFAULT_SETTINGS.defaultActivityId,
     syncInterval: stored.syncInterval ?? DEFAULT_SETTINGS.syncInterval,
+    themeMode: stored.themeMode ?? DEFAULT_SETTINGS.themeMode,
   };
 }
 

@@ -150,6 +150,9 @@ export interface JiraSearchResult {
   total?: number;
 }
 
+// Theme mode
+export type ThemeMode = 'system' | 'light' | 'dark';
+
 // App Settings
 export interface AppSettings {
   kimai: KimaiSettings;
@@ -161,6 +164,7 @@ export interface AppSettings {
   defaultProjectId: number | null;
   defaultActivityId: number | null;
   syncInterval: number; // minutes
+  themeMode: ThemeMode;
 }
 
 // Timer State
@@ -221,6 +225,11 @@ export const IPC_CHANNELS = {
   GET_REMINDERS_ENABLED: 'get-reminders-enabled',
   TOGGLE_REMINDERS: 'toggle-reminders',
 
+  // Theme
+  GET_THEME_MODE: 'get-theme-mode',
+  SET_THEME_MODE: 'set-theme-mode',
+  GET_SHOULD_USE_DARK_COLORS: 'get-should-use-dark-colors',
+
   // Window
   OPEN_SETTINGS: 'open-settings',
   OPEN_TIME_ENTRY: 'open-time-entry',
@@ -263,4 +272,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultProjectId: null,
   defaultActivityId: null,
   syncInterval: 15,
+  themeMode: 'system',
 };

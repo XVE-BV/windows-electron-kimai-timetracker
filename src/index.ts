@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell, net, screen } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell, net, screen, nativeTheme } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
@@ -11,7 +11,7 @@ import {
   getTimerState,
   updateTimerState,
 } from './services/store';
-import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity } from './types';
+import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ThemeMode } from './types';
 import {
   validateAppSettings,
   validateOptionalPositiveInt,
@@ -569,6 +569,22 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.GET_REMINDERS_ENABLED, () => getRemindersEnabled());
   ipcMain.handle(IPC_CHANNELS.TOGGLE_REMINDERS, () => toggleReminders());
 
+  // Theme
+  ipcMain.handle(IPC_CHANNELS.GET_THEME_MODE, () => {
+    return nativeTheme.themeSource;
+  });
+  ipcMain.handle(IPC_CHANNELS.SET_THEME_MODE, (_, mode: ThemeMode) => {
+    nativeTheme.themeSource = mode;
+    // Save to settings
+    const settings = getSettings();
+    settings.themeMode = mode;
+    saveSettings(settings);
+    return mode;
+  });
+  ipcMain.handle(IPC_CHANNELS.GET_SHOULD_USE_DARK_COLORS, () => {
+    return nativeTheme.shouldUseDarkColors;
+  });
+
   // Window
   ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, () => {
     navigateTrayWindow(VIEW_HASHES.SETTINGS);
@@ -733,6 +749,19 @@ function setupIPC(): void {
 async function initializeApp(): Promise<void> {
   // Setup IPC handlers FIRST (before any windows load)
   setupIPC();
+
+  // Apply saved theme setting
+  const settings = getSettings();
+  nativeTheme.themeSource = settings.themeMode || 'system';
+
+  // Listen for system theme changes and notify renderer
+  nativeTheme.on('updated', () => {
+    const shouldUseDark = nativeTheme.shouldUseDarkColors;
+    // Notify all windows
+    BrowserWindow.getAllWindows().forEach(win => {
+      win.webContents.send('theme-changed', shouldUseDark);
+    });
+  });
 
   // Create tray
   const icon = createTrayIcon();

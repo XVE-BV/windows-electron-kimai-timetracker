@@ -12,6 +12,7 @@ import {
   AWEvent,
   JiraIssue,
   ActivitySummaryItem,
+  ThemeMode,
 } from './types';
 
 // Expose protected methods that allow the renderer process to use
@@ -58,6 +59,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Reminders
   getRemindersEnabled: () => ipcRenderer.invoke(IPC_CHANNELS.GET_REMINDERS_ENABLED),
   toggleReminders: () => ipcRenderer.invoke(IPC_CHANNELS.TOGGLE_REMINDERS),
+
+  // Theme
+  getThemeMode: () => ipcRenderer.invoke(IPC_CHANNELS.GET_THEME_MODE),
+  setThemeMode: (mode: ThemeMode) => ipcRenderer.invoke(IPC_CHANNELS.SET_THEME_MODE, mode),
+  getShouldUseDarkColors: () => ipcRenderer.invoke(IPC_CHANNELS.GET_SHOULD_USE_DARK_COLORS),
+  onThemeChanged: (callback: (shouldUseDark: boolean) => void) => {
+    const listener = (_event: Electron.IpcRendererEvent, shouldUseDark: boolean) => callback(shouldUseDark);
+    ipcRenderer.on('theme-changed', listener);
+    return () => ipcRenderer.removeListener('theme-changed', listener);
+  },
 
   // Window
   openSettings: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_SETTINGS),
@@ -108,6 +119,10 @@ export interface ElectronAPI {
   getTimerState: () => Promise<TimerState>;
   getRemindersEnabled: () => Promise<boolean>;
   toggleReminders: () => Promise<boolean>;
+  getThemeMode: () => Promise<ThemeMode>;
+  setThemeMode: (mode: ThemeMode) => Promise<ThemeMode>;
+  getShouldUseDarkColors: () => Promise<boolean>;
+  onThemeChanged: (callback: (shouldUseDark: boolean) => void) => () => void;
   openSettings: () => Promise<void>;
   openTimeEntry: () => Promise<void>;
   openChangelog: () => Promise<void>;

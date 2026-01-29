@@ -3,10 +3,10 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, RefreshCw, Monitor, Layers, Briefcase,
   FileText, Search, X, Users, Ticket, Trash2, AlertCircle, ScrollText,
-  Bell, BellOff, Bug, PanelRightClose
+  Bell, BellOff, Bug, PanelRightClose, Moon, Sun, Laptop
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem } from '../types';
+import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem, ThemeMode } from '../types';
 import { formatDurationHuman } from '../utils';
 import { DATA_REFRESH_INTERVAL_MS, TIMER_UPDATE_INTERVAL_MS, MAX_RECENT_TIMESHEETS, MAX_ACTIVITY_SUMMARY_ITEMS, MAX_JIRA_ISSUES } from '../constants';
 
@@ -50,6 +50,48 @@ export function TrayView() {
   // Panel states
   const [recentEntriesOpen, setRecentEntriesOpen] = useState(false);
   const [activityPanelOpen, setActivityPanelOpen] = useState(false);
+
+  // Theme state (using Electron's nativeTheme)
+  const [themeMode, setThemeMode] = useState<ThemeMode>('system');
+  const [isDark, setIsDark] = useState(false);
+
+  // Initialize theme from Electron's nativeTheme
+  useEffect(() => {
+    const initTheme = async () => {
+      if (!window.electronAPI) return;
+      const mode = await window.electronAPI.getThemeMode();
+      const shouldUseDark = await window.electronAPI.getShouldUseDarkColors();
+      setThemeMode(mode);
+      setIsDark(shouldUseDark);
+    };
+    initTheme();
+
+    // Listen for theme changes
+    const unsubscribe = window.electronAPI?.onThemeChanged?.((shouldUseDark) => {
+      setIsDark(shouldUseDark);
+    });
+
+    return () => unsubscribe?.();
+  }, []);
+
+  // Apply dark mode class to document
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [isDark]);
+
+  // Handle theme mode change
+  const handleThemeModeChange = async (mode: ThemeMode) => {
+    if (!window.electronAPI) return;
+    await window.electronAPI.setThemeMode(mode);
+    setThemeMode(mode);
+    // Update dark state after changing mode
+    const shouldUseDark = await window.electronAPI.getShouldUseDarkColors();
+    setIsDark(shouldUseDark);
+  };
 
   // Error notification state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -857,6 +899,23 @@ export function TrayView() {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // Cycle through: system -> light -> dark -> system
+                const nextMode: ThemeMode = themeMode === 'system' ? 'light' : themeMode === 'light' ? 'dark' : 'system';
+                handleThemeModeChange(nextMode);
+              }}
+              className="p-1.5 hover:bg-muted rounded border border-border"
+              title={`Theme: ${themeMode} (click to change)`}
+            >
+              {themeMode === 'system' ? (
+                <Laptop className="h-4 w-4 text-muted-foreground" />
+              ) : themeMode === 'dark' ? (
+                <Moon className="h-4 w-4 text-blue-500" />
+              ) : (
+                <Sun className="h-4 w-4 text-yellow-500" />
+              )}
+            </button>
             <button
               onClick={handleToggleReminders}
               className={`p-1.5 rounded border ${remindersEnabled ? 'text-primary border-primary/50 bg-primary/10' : 'text-muted-foreground border-border hover:bg-muted'}`}
