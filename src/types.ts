@@ -165,6 +165,7 @@ export interface AppSettings {
   defaultActivityId: number | null;
   syncInterval: number; // minutes
   themeMode: ThemeMode;
+  favoriteCustomerIds: number[];
 }
 
 // Timer State
@@ -273,4 +274,5 @@ export const DEFAULT_SETTINGS: AppSettings = {
   defaultActivityId: null,
   syncInterval: 15,
   themeMode: 'system',
+  favoriteCustomerIds: [],
 };

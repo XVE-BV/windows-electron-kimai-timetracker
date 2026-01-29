@@ -3,7 +3,7 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, RefreshCw, Monitor, Layers, Briefcase,
   FileText, Search, X, Users, Ticket, Trash2, AlertCircle, ScrollText,
-  Bell, BellOff, Bug, PanelRightClose, Moon, Sun, Laptop
+  Bell, BellOff, Bug, PanelRightClose, Moon, Sun, Laptop, Star
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem, ThemeMode } from '../types';
@@ -46,6 +46,9 @@ export function TrayView() {
 
   // Reminders state
   const [remindersEnabled, setRemindersEnabled] = useState(true);
+
+  // Favorite customers
+  const [favoriteCustomerIds, setFavoriteCustomerIds] = useState<number[]>([]);
 
   // Panel states
   const [recentEntriesOpen, setRecentEntriesOpen] = useState(false);
@@ -158,6 +161,10 @@ export function TrayView() {
       // Load customers
       const custs = await window.electronAPI.kimaiGetCustomers();
       setCustomers(custs);
+
+      // Load favorite customer IDs from settings
+      const settingsForFavorites = await window.electronAPI.getSettings();
+      setFavoriteCustomerIds(settingsForFavorites.favoriteCustomerIds || []);
 
       // Load all projects
       const projs = await window.electronAPI.kimaiGetProjects();
@@ -587,10 +594,20 @@ export function TrayView() {
 
   // Filtered lists based on search query
   const filteredCustomers = useMemo(() => {
-    if (!searchQuery) return customers;
-    const query = searchQuery.toLowerCase();
-    return customers.filter(c => c.name.toLowerCase().includes(query));
+    let filtered = customers;
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = customers.filter(c => c.name.toLowerCase().includes(query));
+    }
+    return filtered;
   }, [customers, searchQuery]);
+
+  // Separate favorite and non-favorite customers
+  const { favoriteCustomers, otherCustomers } = useMemo(() => {
+    const favorites = filteredCustomers.filter(c => favoriteCustomerIds.includes(c.id));
+    const others = filteredCustomers.filter(c => !favoriteCustomerIds.includes(c.id));
+    return { favoriteCustomers: favorites, otherCustomers: others };
+  }, [filteredCustomers, favoriteCustomerIds]);
 
   const filteredProjects = useMemo(() => {
     if (!searchQuery) return projects;
@@ -648,24 +665,59 @@ export function TrayView() {
             )}
           </div>
         </div>
-        <div className="max-h-80 overflow-y-auto">
-          {filteredCustomers.map((customer) => (
-            <button
-              key={customer.id}
-              onClick={() => handleSelectCustomer(customer)}
-              className={`w-full px-4 py-3 text-left hover:bg-accent flex items-center justify-between border-b border-border/50 last:border-0 ${selectedCustomer?.id === customer.id ? 'bg-accent' : ''}`}
-            >
-              <div className="flex items-center gap-2">
-                <Users className="h-4 w-4 text-muted-foreground" />
-                <span className="text-sm">{customer.name}</span>
-              </div>
-              <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </button>
-          ))}
-          {filteredCustomers.length === 0 && (
+        <div className="flex-1 overflow-y-auto">
+          {filteredCustomers.length === 0 ? (
             <div className="p-4 text-center text-muted-foreground text-sm">
               {searchQuery ? 'No matching customers' : 'No customers available'}
             </div>
+          ) : (
+            <>
+              {/* Favorites Section */}
+              {favoriteCustomers.length > 0 && (
+                <>
+                  <div className="px-4 py-2 text-xs font-medium text-muted-foreground flex items-center gap-1 bg-muted/30">
+                    <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                    Favorites
+                  </div>
+                  {favoriteCustomers.map((customer) => (
+                    <button
+                      key={customer.id}
+                      onClick={() => handleSelectCustomer(customer)}
+                      className={`w-full px-4 py-3 text-left hover:bg-accent flex items-center justify-between border-b border-border/50 ${selectedCustomer?.id === customer.id ? 'bg-accent' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Star className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                        <span className="text-sm">{customer.name}</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ))}
+                </>
+              )}
+              {/* Other Customers Section */}
+              {otherCustomers.length > 0 && (
+                <>
+                  {favoriteCustomers.length > 0 && (
+                    <div className="px-4 py-2 text-xs font-medium text-muted-foreground bg-muted/30">
+                      All Customers
+                    </div>
+                  )}
+                  {otherCustomers.map((customer) => (
+                    <button
+                      key={customer.id}
+                      onClick={() => handleSelectCustomer(customer)}
+                      className={`w-full px-4 py-3 text-left hover:bg-accent flex items-center justify-between border-b border-border/50 last:border-0 ${selectedCustomer?.id === customer.id ? 'bg-accent' : ''}`}
+                    >
+                      <div className="flex items-center gap-2">
+                        <Users className="h-4 w-4 text-muted-foreground" />
+                        <span className="text-sm">{customer.name}</span>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                    </button>
+                  ))}
+                </>
+              )}
+            </>
           )}
         </div>
       </div>

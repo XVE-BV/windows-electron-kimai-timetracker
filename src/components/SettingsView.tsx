@@ -38,6 +38,7 @@ export function SettingsView() {
   const [customers, setCustomers] = useState<KimaiCustomer[]>([]);
   const [projects, setProjects] = useState<KimaiProject[]>([]);
   const [activities, setActivities] = useState<KimaiActivity[]>([]);
+  const [favoriteCustomerIds, setFavoriteCustomerIds] = useState<number[]>([]);
 
   // Check if running in Electron
   const isElectron = typeof window !== 'undefined' && window.electronAPI;
@@ -66,6 +67,7 @@ export function SettingsView() {
       setDefaultCustomer(s.defaultCustomerId?.toString() || 'none');
       setDefaultProject(s.defaultProjectId?.toString() || 'none');
       setDefaultActivity(s.defaultActivityId?.toString() || 'none');
+      setFavoriteCustomerIds(s.favoriteCustomerIds || []);
 
       if (s.kimai.apiUrl && s.kimai.apiToken) {
         await loadCustomers();
@@ -217,6 +219,7 @@ export function SettingsView() {
       defaultActivityId: defaultActivity && defaultActivity !== 'none' ? parseInt(defaultActivity) : null,
       syncInterval: settings.syncInterval,
       themeMode: settings.themeMode,
+      favoriteCustomerIds,
     };
 
     await window.electronAPI.saveSettings(newSettings);
@@ -239,6 +242,15 @@ export function SettingsView() {
     if (value && value !== 'none') {
       loadProjects(parseInt(value));
     }
+  };
+
+  const handleToggleFavoriteCustomer = (customerId: string) => {
+    const id = parseInt(customerId);
+    setFavoriteCustomerIds(prev =>
+      prev.includes(id)
+        ? prev.filter(fid => fid !== id)
+        : [...prev, id]
+    );
   };
 
   const handleProjectChange = (value: string) => {
@@ -482,6 +494,8 @@ export function SettingsView() {
                 placeholder="Select a customer..."
                 searchPlaceholder="Search customers..."
                 emptyText="No customers found."
+                favoriteIds={favoriteCustomerIds.map(id => id.toString())}
+                onToggleFavorite={handleToggleFavoriteCustomer}
               />
             </div>
 
