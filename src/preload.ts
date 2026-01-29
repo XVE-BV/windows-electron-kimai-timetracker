@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   workSessionPause: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_PAUSE),
   workSessionStop: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_STOP),
   workSessionGetState: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_GET_STATE),
+  workSessionToggleReminders: () => ipcRenderer.invoke(IPC_CHANNELS.WORK_SESSION_TOGGLE_REMINDERS),
 
   // Window
   openSettings: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_SETTINGS),
@@ -102,6 +103,7 @@ export interface ElectronAPI {
   workSessionPause: () => Promise<WorkSessionState>;
   workSessionStop: () => Promise<WorkSessionState>;
   workSessionGetState: () => Promise<WorkSessionState>;
+  workSessionToggleReminders: () => Promise<WorkSessionState>;
   openSettings: () => Promise<void>;
   openTimeEntry: () => Promise<void>;
   openChangelog: () => Promise<void>;

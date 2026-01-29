@@ -51,6 +51,7 @@ let timerUpdateInterval: NodeJS.Timeout | null = null;
 let workSessionState: WorkSessionState = {
   status: 'stopped',
   startedAt: null,
+  remindersEnabled: true,
 };
 
 // Work session reminder interval
@@ -240,7 +241,6 @@ async function startTimer(): Promise<void> {
       startTime: timesheet.begin,
     });
 
-    showNotification('Timer Started', 'Time tracking has begun.');
     startTimerUpdateLoop();
     updateTrayMenu();
   } catch (error) {
@@ -257,7 +257,6 @@ async function stopTimer(): Promise<void> {
 
   try {
     await kimaiAPI.stopTimer(timerState.currentTimesheetId);
-    const elapsed = formatDurationCompact(getElapsedSeconds());
 
     updateTimerState({
       isRunning: false,
@@ -265,7 +264,6 @@ async function stopTimer(): Promise<void> {
       startTime: null,
     });
 
-    showNotification('Timer Stopped', `Recorded: ${elapsed}`);
     stopTimerUpdateLoop();
     updateTrayMenu();
   } catch (error) {
@@ -294,6 +292,7 @@ function stopTimerUpdateLoop(): void {
 // Work Session Functions
 function startWorkSession(): WorkSessionState {
   workSessionState = {
+    ...workSessionState,
     status: 'active',
     startedAt: new Date().toISOString(),
   };
@@ -312,6 +311,7 @@ function pauseWorkSession(): WorkSessionState {
 
 function stopWorkSession(): WorkSessionState {
   workSessionState = {
+    ...workSessionState,
     status: 'stopped',
     startedAt: null,
   };
@@ -341,8 +341,8 @@ function stopWorkSessionReminder(): void {
 }
 
 function checkAndRemind(): void {
-  // Only remind if work session is active (not paused or stopped)
-  if (workSessionState.status !== 'active') {
+  // Only remind if work session is active and reminders are enabled
+  if (workSessionState.status !== 'active' || !workSessionState.remindersEnabled) {
     return;
   }
 
@@ -351,6 +351,14 @@ function checkAndRemind(): void {
   if (!timerState.isRunning) {
     showNotification('Time Tracking Reminder', 'You are not tracking time! Start a timer or pause your work session.');
   }
+}
+
+function toggleWorkSessionReminders(): WorkSessionState {
+  workSessionState = {
+    ...workSessionState,
+    remindersEnabled: !workSessionState.remindersEnabled,
+  };
+  return workSessionState;
 }
 
 function showNotification(title: string, body: string): void {
@@ -636,6 +644,7 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.WORK_SESSION_PAUSE, () => pauseWorkSession());
   ipcMain.handle(IPC_CHANNELS.WORK_SESSION_STOP, () => stopWorkSession());
   ipcMain.handle(IPC_CHANNELS.WORK_SESSION_GET_STATE, () => getWorkSessionState());
+  ipcMain.handle(IPC_CHANNELS.WORK_SESSION_TOGGLE_REMINDERS, () => toggleWorkSessionReminders());
 
   // Window
   ipcMain.handle(IPC_CHANNELS.OPEN_SETTINGS, () => {

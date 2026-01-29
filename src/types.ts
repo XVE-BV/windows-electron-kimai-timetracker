@@ -179,6 +179,7 @@ export type WorkSessionStatus = 'stopped' | 'active' | 'paused';
 export interface WorkSessionState {
   status: WorkSessionStatus;
   startedAt: string | null;
+  remindersEnabled: boolean;
 }
 
 // IPC Channel Names
@@ -217,6 +218,7 @@ export const IPC_CHANNELS = {
   WORK_SESSION_PAUSE: 'work-session-pause',
   WORK_SESSION_STOP: 'work-session-stop',
   WORK_SESSION_GET_STATE: 'work-session-get-state',
+  WORK_SESSION_TOGGLE_REMINDERS: 'work-session-toggle-reminders',
 
   // Window
   OPEN_SETTINGS: 'open-settings',

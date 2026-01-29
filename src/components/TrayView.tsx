@@ -3,7 +3,7 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, CheckCircle2, XCircle, RefreshCw, Coffee,
   Monitor, Layers, Briefcase, FileText, Search, X, Users, Ticket, Trash2,
-  Pause, Clock, AlertCircle, ScrollText
+  Pause, Clock, AlertCircle, ScrollText, Bell, BellOff
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, AppSettings, WorkSessionState, ActivitySummaryItem } from '../types';
@@ -42,7 +42,7 @@ export function TrayView() {
   const [jiraSearchQuery, setJiraSearchQuery] = useState('');
 
   // Work session state
-  const [workSession, setWorkSession] = useState<WorkSessionState>({ status: 'stopped', startedAt: null });
+  const [workSession, setWorkSession] = useState<WorkSessionState>({ status: 'stopped', startedAt: null, remindersEnabled: true });
 
   // Error notification state
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -371,6 +371,16 @@ export function TrayView() {
     } catch (error) {
       console.error('Failed to stop work session:', error);
       showError('Failed to stop work session');
+    }
+  };
+
+  const handleToggleReminders = async () => {
+    if (!window.electronAPI) return;
+    try {
+      const state = await window.electronAPI.workSessionToggleReminders();
+      setWorkSession(state);
+    } catch (error) {
+      console.error('Failed to toggle reminders:', error);
     }
   };
 
@@ -830,32 +840,6 @@ export function TrayView() {
         </div>
       )}
 
-      {/* Header with Status */}
-      <div className="p-3 bg-gradient-to-r from-primary/10 to-primary/5 border-b border-border">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="p-1.5 bg-primary/20 rounded-md">
-              <Timer className="h-4 w-4 text-primary" />
-            </div>
-            <span className="font-semibold text-sm">Kimai Tracker</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={loadData}
-              disabled={isRefreshing}
-              className="p-1 hover:bg-muted rounded"
-              aria-label="Refresh data"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
-            </button>
-            <div className="flex items-center gap-1">
-              <div title={`Kimai: ${connectionStatus}`} className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
-              <div title={`ActivityWatch: ${awStatus}`} className={`h-2 w-2 rounded-full ${awStatus === 'connected' ? 'bg-blue-500' : awStatus === 'disabled' ? 'bg-gray-400' : 'bg-red-500'}`} />
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Work Session Controls */}
       <div className="p-2 border-b border-border bg-muted/20">
         <div className="flex items-center justify-between">
@@ -873,10 +857,29 @@ export function TrayView() {
             )}
           </div>
           <div className="flex items-center gap-1">
+            <button
+              onClick={handleToggleReminders}
+              className={`p-1 rounded ${workSession.remindersEnabled ? 'text-primary hover:bg-primary/10' : 'text-muted-foreground hover:bg-muted'}`}
+              title={workSession.remindersEnabled ? 'Reminders on' : 'Reminders off'}
+            >
+              {workSession.remindersEnabled ? <Bell className="h-3.5 w-3.5" /> : <BellOff className="h-3.5 w-3.5" />}
+            </button>
+            <button
+              onClick={loadData}
+              disabled={isRefreshing}
+              className="p-1 hover:bg-muted rounded"
+              aria-label="Refresh data"
+            >
+              <RefreshCw className={`h-3.5 w-3.5 text-muted-foreground ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <div className="flex items-center gap-1 ml-1">
+              <div title={`Kimai: ${connectionStatus}`} className={`h-2 w-2 rounded-full ${connectionStatus === 'connected' ? 'bg-green-500' : connectionStatus === 'disconnected' ? 'bg-red-500' : 'bg-yellow-500 animate-pulse'}`} />
+              <div title={`ActivityWatch: ${awStatus}`} className={`h-2 w-2 rounded-full ${awStatus === 'connected' ? 'bg-blue-500' : awStatus === 'disabled' ? 'bg-gray-400' : 'bg-red-500'}`} />
+            </div>
             {workSession.status === 'stopped' && (
               <button
                 onClick={handleWorkSessionStart}
-                className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1"
+                className="ml-1 px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1"
               >
                 <Play className="h-3 w-3" />
                 Start
@@ -886,7 +889,7 @@ export function TrayView() {
               <>
                 <button
                   onClick={handleWorkSessionPause}
-                  className="px-2 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded flex items-center gap-1"
+                  className="ml-1 px-2 py-1 text-xs bg-yellow-500 hover:bg-yellow-600 text-white rounded flex items-center gap-1"
                 >
                   <Pause className="h-3 w-3" />
                   Pause
@@ -904,7 +907,7 @@ export function TrayView() {
               <>
                 <button
                   onClick={handleWorkSessionStart}
-                  className="px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1"
+                  className="ml-1 px-2 py-1 text-xs bg-green-500 hover:bg-green-600 text-white rounded flex items-center gap-1"
                 >
                   <Play className="h-3 w-3" />
                   Resume
