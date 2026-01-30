@@ -2,13 +2,16 @@ import { autoUpdater, BrowserWindow, app } from 'electron';
 import log from 'electron-log';
 
 export interface UpdateStatus {
-  status: 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error';
+  status: 'idle' | 'checking' | 'available' | 'downloading' | 'ready' | 'error' | 'dev-mode';
   version?: string;
   error?: string;
 }
 
 let currentStatus: UpdateStatus = { status: 'idle' };
 const UPDATE_CHECK_INTERVAL = 60 * 60 * 1000; // 1 hour
+
+// Check if running in development mode
+const isDev = !app.isPackaged;
 
 function notifyRenderer(): void {
   BrowserWindow.getAllWindows().forEach(win => {
@@ -21,6 +24,12 @@ export function getUpdateStatus(): UpdateStatus {
 }
 
 export function checkForUpdates(): void {
+  if (isDev) {
+    log.info('Skipping update check in development mode');
+    currentStatus = { status: 'dev-mode' };
+    return;
+  }
+
   if (currentStatus.status === 'checking' || currentStatus.status === 'downloading') {
     return; // Already in progress
   }
@@ -43,6 +52,12 @@ export function quitAndInstall(): void {
 }
 
 export function initAutoUpdater(): void {
+  if (isDev) {
+    log.info('Auto-updater disabled in development mode');
+    currentStatus = { status: 'dev-mode' };
+    return;
+  }
+
   const repo = 'XVE-BV/windows-electron-kimai-timetracker';
   const feedURL = `https://update.electronjs.org/${repo}/${process.platform}-${process.arch}/${app.getVersion()}`;
 
