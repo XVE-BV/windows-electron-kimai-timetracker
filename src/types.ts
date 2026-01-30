@@ -186,6 +186,7 @@ export const VIEW_HASHES = {
   TIME_ENTRY: 'time-entry',
   CHANGELOG: 'changelog',
   DEBUG: 'debug',
+  TIME_ROUNDING: 'time-rounding',
 } as const;
 
 export type ViewHash = typeof VIEW_HASHES[keyof typeof VIEW_HASHES];
@@ -253,6 +254,9 @@ export const IPC_CHANNELS = {
   GET_UPDATE_STATUS: 'get-update-status',
   CHECK_FOR_UPDATES: 'check-for-updates',
   QUIT_AND_INSTALL: 'quit-and-install',
+
+  // Help
+  OPEN_TIME_ROUNDING: 'open-time-rounding',
 } as const;
 
 // Default Settings

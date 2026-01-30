@@ -87,6 +87,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debugGetLogs: () => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_GET_LOGS),
   debugClearLogs: () => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_CLEAR_LOGS),
   openDebug: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_DEBUG),
+  openTimeRounding: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_TIME_ROUNDING),
 
   // Updates
   getUpdateStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_UPDATE_STATUS),
@@ -161,6 +162,7 @@ export interface ElectronAPI {
   }>>;
   debugClearLogs: () => Promise<{ success: boolean }>;
   openDebug: () => Promise<void>;
+  openTimeRounding: () => Promise<void>;
   getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;
   checkForUpdates: () => Promise<{ status: string; version?: string; error?: string }>;
   quitAndInstall: () => Promise<void>;

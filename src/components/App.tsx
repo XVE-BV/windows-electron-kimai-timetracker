@@ -5,6 +5,7 @@ import { MainView } from './MainView';
 import { TrayView } from './TrayView';
 import { ChangelogView } from './ChangelogView';
 import { DebugView } from './DebugView';
+import { TimeRoundingView } from './TimeRoundingView';
 import { ErrorBoundary } from './ErrorBoundary';
 import { VIEW_HASHES, ViewHash } from '../types';
 
@@ -26,6 +27,8 @@ export function App() {
         setView(VIEW_HASHES.CHANGELOG);
       } else if (hash === VIEW_HASHES.DEBUG) {
         setView(VIEW_HASHES.DEBUG);
+      } else if (hash === VIEW_HASHES.TIME_ROUNDING) {
+        setView(VIEW_HASHES.TIME_ROUNDING);
       } else {
         setView('main');
       }
@@ -44,6 +47,7 @@ export function App() {
         {view === VIEW_HASHES.TRAY && <TrayView />}
         {view === VIEW_HASHES.CHANGELOG && <ChangelogView />}
         {view === VIEW_HASHES.DEBUG && <DebugView />}
+        {view === VIEW_HASHES.TIME_ROUNDING && <TimeRoundingView />}
         {view === 'main' && <MainView />}
       </div>
     </ErrorBoundary>

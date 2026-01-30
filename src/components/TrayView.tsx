@@ -3,7 +3,8 @@ import {
   Play, Square, Settings, Plus, Activity, ChevronRight, Timer,
   Calendar, TrendingUp, Zap, RefreshCw, Monitor, Layers, Briefcase,
   FileText, Search, X, Users, Ticket, Trash2, AlertCircle, ScrollText,
-  Bell, BellOff, Bug, PanelRightClose, Moon, Sun, Laptop, Star, Download
+  Bell, BellOff, Bug, PanelRightClose, Moon, Sun, Laptop, Star, Download,
+  Clock
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem, ThemeMode } from '../types';
@@ -1417,6 +1418,13 @@ export function TrayView() {
         >
           <Plus className="h-3 w-3" />
           Manual Entry
+        </button>
+        <button
+          onClick={() => window.electronAPI?.openTimeRounding()}
+          className="px-2 py-2 text-xs text-muted-foreground hover:text-foreground hover:bg-muted rounded-md flex items-center justify-center"
+          title="Time Rounding Info"
+        >
+          <Clock className="h-3 w-3" />
         </button>
         <button
           onClick={() => window.electronAPI?.openChangelog()}

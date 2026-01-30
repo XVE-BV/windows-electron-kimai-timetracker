@@ -700,6 +700,10 @@ function setupIPC(): void {
     navigateTrayWindow(VIEW_HASHES.DEBUG);
   });
 
+  ipcMain.handle(IPC_CHANNELS.OPEN_TIME_ROUNDING, () => {
+    navigateTrayWindow(VIEW_HASHES.TIME_ROUNDING);
+  });
+
   // Updates
   ipcMain.handle(IPC_CHANNELS.GET_UPDATE_STATUS, () => getUpdateStatus());
   ipcMain.handle(IPC_CHANNELS.CHECK_FOR_UPDATES, () => {
