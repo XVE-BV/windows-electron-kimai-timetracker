@@ -259,6 +259,31 @@ export const IPC_CHANNELS = {
   OPEN_TIME_ROUNDING: 'open-time-rounding',
 } as const;
 
+// QR Code Payload for Mobile App Setup
+export interface MobileSetupQRPayload {
+  v: 1; // Version for future compatibility
+  ts: number; // Unix timestamp in seconds (created)
+  exp: number; // Unix timestamp in seconds (expires)
+  kimai: {
+    url: string;
+    token: string;
+  };
+  jira?: {
+    url: string;
+    email: string;
+    token: string;
+  };
+  fav: string[]; // Favorite customer IDs (as strings for Flutter compatibility)
+  def?: {
+    cid?: number; // Default customer ID
+    pid?: number; // Default project ID
+    aid?: number; // Default activity ID
+  };
+}
+
+// QR Code expiration time in milliseconds (5 minutes)
+export const QR_CODE_EXPIRATION_MS = 5 * 60 * 1000;
+
 // Default Settings
 export const DEFAULT_SETTINGS: AppSettings = {
   kimai: {

@@ -6,6 +6,7 @@ import { Label } from './ui/label';
 import { Switch } from './ui/switch';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Combobox } from './ui/combobox';
+import { QRCodeGenerator } from './QRCodeGenerator';
 import { AppSettings, KimaiCustomer, KimaiProject, KimaiActivity } from '../types';
 
 type ConnectionStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -533,6 +534,9 @@ export function SettingsView() {
           </CardContent>
         )}
       </Card>
+
+      {/* Mobile App Setup - QR Code Generator */}
+      {settings && <QRCodeGenerator settings={settings} />}
 
       {/* Actions */}
       <div className="flex justify-end gap-3 pt-4 pb-4">
