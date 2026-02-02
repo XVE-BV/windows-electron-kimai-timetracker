@@ -57,6 +57,7 @@ const store = new Store<StoreSchema>({
       projectId: null,
       activityId: null,
       description: '',
+      jiraIssue: null,
     },
   },
 });
@@ -161,6 +162,7 @@ const DEFAULT_TIMER_STATE: TimerState = {
   projectId: null,
   activityId: null,
   description: '',
+  jiraIssue: null,
 };
 
 export function getTimerState(): TimerState {

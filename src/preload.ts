@@ -52,9 +52,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke(IPC_CHANNELS.JIRA_SEARCH_ISSUES, jql, maxResults),
   jiraAddWorklog: (issueKey: string, timeSpentSeconds: number, started: string, comment?: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.JIRA_ADD_WORKLOG, issueKey, timeSpentSeconds, started, comment),
+  jiraTransitionToInProgress: (issueKey: string) =>
+    ipcRenderer.invoke(IPC_CHANNELS.JIRA_TRANSITION_TO_IN_PROGRESS, issueKey),
 
   // Timer State
   getTimerState: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TIMER_STATE),
+  setTimerJiraIssue: (jiraIssue: JiraIssue | null) => ipcRenderer.invoke(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, jiraIssue),
 
   // Reminders
   getRemindersEnabled: () => ipcRenderer.invoke(IPC_CHANNELS.GET_REMINDERS_ENABLED),
@@ -88,6 +91,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debugClearLogs: () => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_CLEAR_LOGS),
   openDebug: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_DEBUG),
   openTimeRounding: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_TIME_ROUNDING),
+
+  // Notifications
+  showNotification: (title: string, body: string) => ipcRenderer.invoke(IPC_CHANNELS.SHOW_NOTIFICATION, title, body),
 
   // Updates
   getUpdateStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_UPDATE_STATUS),
@@ -127,7 +133,9 @@ export interface ElectronAPI {
   jiraGetMyIssues: (maxResults?: number) => Promise<JiraIssue[]>;
   jiraSearchIssues: (jql: string, maxResults?: number) => Promise<JiraIssue[]>;
   jiraAddWorklog: (issueKey: string, timeSpentSeconds: number, started: string, comment?: string) => Promise<{ id: string }>;
+  jiraTransitionToInProgress: (issueKey: string) => Promise<{ success: boolean; message: string }>;
   getTimerState: () => Promise<TimerState>;
+  setTimerJiraIssue: (jiraIssue: JiraIssue | null) => Promise<TimerState>;
   getRemindersEnabled: () => Promise<boolean>;
   toggleReminders: () => Promise<boolean>;
   getThemeMode: () => Promise<ThemeMode>;
@@ -163,6 +171,7 @@ export interface ElectronAPI {
   debugClearLogs: () => Promise<{ success: boolean }>;
   openDebug: () => Promise<void>;
   openTimeRounding: () => Promise<void>;
+  showNotification: (title: string, body: string) => Promise<void>;
   getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;
   checkForUpdates: () => Promise<{ status: string; version?: string; error?: string }>;
   quitAndInstall: () => Promise<void>;

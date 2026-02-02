@@ -177,6 +177,7 @@ export interface TimerState {
   projectId: number | null;
   activityId: number | null;
   description: string;
+  jiraIssue: JiraIssue | null;     // Selected Jira issue (persisted)
 }
 
 // View Hashes for single-window navigation
@@ -219,9 +220,11 @@ export const IPC_CHANNELS = {
   JIRA_GET_MY_ISSUES: 'jira-get-my-issues',
   JIRA_SEARCH_ISSUES: 'jira-search-issues',
   JIRA_ADD_WORKLOG: 'jira-add-worklog',
+  JIRA_TRANSITION_TO_IN_PROGRESS: 'jira-transition-to-in-progress',
 
   // Timer
   GET_TIMER_STATE: 'get-timer-state',
+  SET_TIMER_JIRA_ISSUE: 'set-timer-jira-issue',
 
   // Reminders
   GET_REMINDERS_ENABLED: 'get-reminders-enabled',
@@ -257,6 +260,9 @@ export const IPC_CHANNELS = {
 
   // Help
   OPEN_TIME_ROUNDING: 'open-time-rounding',
+
+  // Notifications
+  SHOW_NOTIFICATION: 'show-notification',
 } as const;
 
 // QR Code Payload for Mobile App Setup

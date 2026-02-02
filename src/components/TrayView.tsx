@@ -156,10 +156,13 @@ export function TrayView() {
       const state = await window.electronAPI.getTimerState();
       setTimerState(state);
 
-      // Load description from running timer
-      if (state.isRunning && state.description) {
+      // Load description and Jira issue from timer state
+      if (state.description) {
         setDescription(state.description);
         setSavedDescription(state.description);
+      }
+      if (state.jiraIssue) {
+        setSelectedJiraIssue(state.jiraIssue);
       }
 
       // Load customers
@@ -267,14 +270,12 @@ export function TrayView() {
       setAwStatus('disconnected');
     }
 
-    // Load Jira issues if enabled
+    // Load Jira settings (but not issues - those are fetched when opening the picker)
     try {
       const settings = await window.electronAPI.getSettings();
       if (settings.jira?.enabled) {
         setJiraEnabled(true);
         setJiraAutoLogWorklog(settings.jira?.autoLogWorklog || false);
-        const issues = await window.electronAPI.jiraGetMyIssues(MAX_JIRA_ISSUES);
-        setJiraIssues(issues);
         setJiraStatus('connected');
       } else {
         setJiraEnabled(false);
@@ -282,8 +283,7 @@ export function TrayView() {
         setJiraStatus('disabled');
       }
     } catch (error) {
-      console.error('Failed to load Jira issues:', error);
-      // Check current jira enabled state via settings fetch
+      console.error('Failed to load Jira settings:', error);
       setJiraStatus('disconnected');
     }
 
@@ -399,10 +399,34 @@ export function TrayView() {
           setDescription('');
           setSavedDescription('');
           setSelectedJiraIssue(null);
+          window.electronAPI.setTimerJiraIssue(null);
         }
       } else if (selectedProject && selectedActivity) {
         await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
         setSavedDescription(description);
+
+        // Transition Jira issue to "In Progress" if it's currently "To Do"
+        if (selectedJiraIssue && selectedJiraIssue.fields.status.name.toLowerCase() === 'to do') {
+          try {
+            const result = await window.electronAPI.jiraTransitionToInProgress(selectedJiraIssue.key);
+            if (result.success) {
+              // Update the local issue status and persist to timer state
+              const updatedIssue = {
+                ...selectedJiraIssue,
+                fields: {
+                  ...selectedJiraIssue.fields,
+                  status: { ...selectedJiraIssue.fields.status, name: 'In Progress' },
+                },
+              };
+              setSelectedJiraIssue(updatedIssue);
+              window.electronAPI.setTimerJiraIssue(updatedIssue);
+            } else {
+              console.warn('Failed to transition Jira issue:', result.message);
+            }
+          } catch (error) {
+            console.error('Failed to transition Jira issue:', error);
+          }
+        }
       }
       await loadData();
     } catch (error) {
@@ -596,20 +620,33 @@ export function TrayView() {
           setActivities([]);
         }
       } else {
-        // No matching customer found - clear selections
+        // No matching customer found - clear selections and show notification
         setSelectedCustomer(null);
         setSelectedProject(null);
         setSelectedActivity(null);
         setProjects([]);
         setActivities([]);
+
+        // Show desktop notification about missing customer
+        const customerFieldValue = (issue.fields.customfield_10278 as { value?: string } | undefined)?.value;
+        const projectName = issue.fields.project?.name;
+        const searchedValue = customerFieldValue || projectName || 'unknown';
+        window.electronAPI?.showNotification(
+          'No Customer Found',
+          `Could not find a matching customer for "${searchedValue}". Please select customer/project manually.`
+        );
       }
     }
+
+    // Save Jira issue to timer state so it persists across navigation
+    window.electronAPI?.setTimerJiraIssue(issue);
 
     setView('main');
   };
 
   const clearJiraIssue = () => {
     setSelectedJiraIssue(null);
+    window.electronAPI?.setTimerJiraIssue(null);
   };
 
   const openSettings = () => {
@@ -1202,7 +1239,18 @@ export function TrayView() {
               </div>
             ) : (
               <button
-                onClick={() => setView('jira')}
+                onClick={async () => {
+                  // Fetch Jira issues when opening the picker
+                  if (window.electronAPI) {
+                    try {
+                      const issues = await window.electronAPI.jiraGetMyIssues(MAX_JIRA_ISSUES);
+                      setJiraIssues(issues);
+                    } catch (error) {
+                      console.error('Failed to fetch Jira issues:', error);
+                    }
+                  }
+                  setView('jira');
+                }}
                 disabled={timerState?.isRunning}
                 className="w-full px-3 py-2 text-left bg-muted/50 hover:bg-muted rounded-md flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
               >

@@ -168,6 +168,40 @@ class JiraAPI {
 
     return this.request<{ id: string }>('POST', `/issue/${issueKey}/worklog`, body);
   }
+
+  async getTransitions(issueKey: string): Promise<{ id: string; name: string; to: { name: string } }[]> {
+    const result = await this.request<{ transitions: { id: string; name: string; to: { name: string } }[] }>(
+      'GET',
+      `/issue/${issueKey}/transitions`
+    );
+    return result.transitions;
+  }
+
+  async transitionIssue(issueKey: string, transitionId: string): Promise<void> {
+    await this.request<void>('POST', `/issue/${issueKey}/transitions`, {
+      transition: { id: transitionId },
+    });
+  }
+
+  async transitionToInProgress(issueKey: string): Promise<{ success: boolean; message: string }> {
+    try {
+      const transitions = await this.getTransitions(issueKey);
+      // Find a transition that leads to "In Progress"
+      const inProgressTransition = transitions.find(t =>
+        t.to.name.toLowerCase() === 'in progress'
+      );
+
+      if (!inProgressTransition) {
+        return { success: false, message: 'No transition to "In Progress" available' };
+      }
+
+      await this.transitionIssue(issueKey, inProgressTransition.id);
+      return { success: true, message: `Transitioned to ${inProgressTransition.to.name}` };
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error';
+      return { success: false, message };
+    }
+  }
 }
 
 export const jiraAPI = new JiraAPI();

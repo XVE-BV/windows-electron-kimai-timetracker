@@ -11,7 +11,7 @@ import {
   getTimerState,
   updateTimerState,
 } from './services/store';
-import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ThemeMode } from './types';
+import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ThemeMode, JiraIssue } from './types';
 import {
   validateAppSettings,
   validateOptionalPositiveInt,
@@ -561,9 +561,16 @@ function setupIPC(): void {
     const validComment = validateOptionalString(comment, 'comment');
     return jiraAPI.addWorklog(validIssueKey, validTimeSpent, new Date(validStarted), validComment);
   });
+  ipcMain.handle(IPC_CHANNELS.JIRA_TRANSITION_TO_IN_PROGRESS, (_, issueKey: unknown) => {
+    const validIssueKey = validateNonEmptyString(issueKey, 'issueKey');
+    return jiraAPI.transitionToInProgress(validIssueKey);
+  });
 
   // Timer State
   ipcMain.handle(IPC_CHANNELS.GET_TIMER_STATE, () => getTimerState());
+  ipcMain.handle(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, (_, jiraIssue: JiraIssue | null) => {
+    return updateTimerState({ jiraIssue });
+  });
 
   // Work Session
   ipcMain.handle(IPC_CHANNELS.GET_REMINDERS_ENABLED, () => getRemindersEnabled());
@@ -702,6 +709,11 @@ function setupIPC(): void {
 
   ipcMain.handle(IPC_CHANNELS.OPEN_TIME_ROUNDING, () => {
     navigateTrayWindow(VIEW_HASHES.TIME_ROUNDING);
+  });
+
+  // Notifications
+  ipcMain.handle(IPC_CHANNELS.SHOW_NOTIFICATION, (_, title: string, body: string) => {
+    showNotification(title, body);
   });
 
   // Updates
