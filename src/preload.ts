@@ -58,6 +58,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   // Timer State
   getTimerState: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TIMER_STATE),
   setTimerJiraIssue: (jiraIssue: JiraIssue | null) => ipcRenderer.invoke(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, jiraIssue),
+  setTimerSelections: (selections: { customerId?: number | null; projectId?: number | null; activityId?: number | null }) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SET_TIMER_SELECTIONS, selections),
 
   // Reminders
   getRemindersEnabled: () => ipcRenderer.invoke(IPC_CHANNELS.GET_REMINDERS_ENABLED),
@@ -136,6 +138,7 @@ export interface ElectronAPI {
   jiraTransitionToInProgress: (issueKey: string) => Promise<{ success: boolean; message: string }>;
   getTimerState: () => Promise<TimerState>;
   setTimerJiraIssue: (jiraIssue: JiraIssue | null) => Promise<TimerState>;
+  setTimerSelections: (selections: { customerId?: number | null; projectId?: number | null; activityId?: number | null }) => Promise<TimerState>;
   getRemindersEnabled: () => Promise<boolean>;
   toggleReminders: () => Promise<boolean>;
   getThemeMode: () => Promise<ThemeMode>;

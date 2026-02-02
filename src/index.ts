@@ -571,6 +571,9 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, (_, jiraIssue: JiraIssue | null) => {
     return updateTimerState({ jiraIssue });
   });
+  ipcMain.handle(IPC_CHANNELS.SET_TIMER_SELECTIONS, (_, selections: { customerId?: number | null; projectId?: number | null; activityId?: number | null }) => {
+    return updateTimerState(selections);
+  });
 
   // Work Session
   ipcMain.handle(IPC_CHANNELS.GET_REMINDERS_ENABLED, () => getRemindersEnabled());

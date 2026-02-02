@@ -197,8 +197,30 @@ export function TrayView() {
           const act = acts.find(a => a.id === state.activityId);
           setSelectedActivity(act || null);
         }
+      } else if (state.jiraIssue && state.customerId) {
+        // Timer not running but Jira issue selected - restore saved selections
+        const cust = custs.find(c => c.id === state.customerId);
+        if (cust) {
+          setSelectedCustomer(cust);
+          setProjects(projs.filter(p => p.customer === cust.id));
+        }
+
+        if (state.projectId) {
+          const proj = projs.find(p => p.id === state.projectId);
+          setSelectedProject(proj || null);
+
+          if (proj) {
+            const acts = await window.electronAPI.kimaiGetActivities(state.projectId);
+            setActivities(acts);
+
+            if (state.activityId) {
+              const act = acts.find(a => a.id === state.activityId);
+              setSelectedActivity(act || null);
+            }
+          }
+        }
       } else {
-        // Timer not running - load defaults from settings if enabled
+        // Timer not running, no Jira issue - load defaults from settings if enabled
         const settings = await window.electronAPI.getSettings();
         if (settings.useDefaults) {
           if (settings.defaultCustomerId) {
@@ -529,6 +551,11 @@ export function TrayView() {
     setDescription(`${issue.key}: ${issue.fields.summary}`);
     setJiraSearchQuery('');
 
+    // Track final selections to persist
+    let finalCustomerId: number | null = null;
+    let finalProjectId: number | null = null;
+    let finalActivityId: number | null = null;
+
     // Always try to match and set customer/project/activity from Jira ticket
     if (customers.length > 0) {
       // Try to match customfield_10278 (customer field) first
@@ -568,6 +595,7 @@ export function TrayView() {
       // Set the matched customer and load projects
       if (matchedCustomer) {
         setSelectedCustomer(matchedCustomer);
+        finalCustomerId = matchedCustomer.id;
         const filteredProjects = allProjects.filter(p => p.customer === matchedCustomer.id);
         setProjects(filteredProjects);
 
@@ -586,6 +614,7 @@ export function TrayView() {
 
         if (selectedProj) {
           setSelectedProject(selectedProj);
+          finalProjectId = selectedProj.id;
 
           // Load activities for this project
           if (window.electronAPI) {
@@ -594,20 +623,20 @@ export function TrayView() {
               setActivities(acts);
 
               // Auto-select activity: prefer "werk"/"work", otherwise first if only one
+              let selectedAct: KimaiActivity | null = null;
               if (acts.length === 1) {
-                setSelectedActivity(acts[0]);
+                selectedAct = acts[0];
               } else if (acts.length > 1) {
                 // Try to find a "work" activity
-                const workActivity = acts.find(a =>
+                selectedAct = acts.find(a =>
                   a.name.toLowerCase() === 'werk' ||
                   a.name.toLowerCase() === 'work' ||
                   a.name.toLowerCase().includes('werk') ||
                   a.name.toLowerCase().includes('work')
-                );
-                setSelectedActivity(workActivity || null);
-              } else {
-                setSelectedActivity(null);
+                ) || null;
               }
+              setSelectedActivity(selectedAct);
+              finalActivityId = selectedAct?.id || null;
             } catch (error) {
               console.error('Failed to load activities:', error);
               setActivities([]);
@@ -638,15 +667,30 @@ export function TrayView() {
       }
     }
 
-    // Save Jira issue to timer state so it persists across navigation
+    // Save Jira issue and selections to timer state so they persist across navigation
     window.electronAPI?.setTimerJiraIssue(issue);
+    window.electronAPI?.setTimerSelections({
+      customerId: finalCustomerId,
+      projectId: finalProjectId,
+      activityId: finalActivityId,
+    });
 
     setView('main');
   };
 
   const clearJiraIssue = () => {
     setSelectedJiraIssue(null);
+    setSelectedCustomer(null);
+    setSelectedProject(null);
+    setSelectedActivity(null);
+    setProjects([]);
+    setActivities([]);
     window.electronAPI?.setTimerJiraIssue(null);
+    window.electronAPI?.setTimerSelections({
+      customerId: null,
+      projectId: null,
+      activityId: null,
+    });
   };
 
   const openSettings = () => {

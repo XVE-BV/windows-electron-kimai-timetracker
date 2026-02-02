@@ -174,6 +174,7 @@ export interface TimerState {
   currentTimesheetId: number | null;
   startTime: string | null;        // Kimai's rounded start time
   actualStartTime: string | null;  // When user actually clicked Start
+  customerId: number | null;       // Selected customer (persisted)
   projectId: number | null;
   activityId: number | null;
   description: string;
@@ -225,6 +226,7 @@ export const IPC_CHANNELS = {
   // Timer
   GET_TIMER_STATE: 'get-timer-state',
   SET_TIMER_JIRA_ISSUE: 'set-timer-jira-issue',
+  SET_TIMER_SELECTIONS: 'set-timer-selections',
 
   // Reminders
   GET_REMINDERS_ENABLED: 'get-reminders-enabled',
