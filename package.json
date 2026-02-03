@@ -60,6 +60,14 @@
     "ts-loader": "^9.5.4",
     "typescript": "^5.3.3"
   },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller",
+      "fs-xattr",
+      "macos-alias"
+    ]
+  },
   "dependencies": {
     "@radix-ui/react-checkbox": "^1.3.3",
     "@radix-ui/react-dialog": "^1.1.15",
