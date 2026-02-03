@@ -113,7 +113,9 @@ class JiraAPI {
   }
 
   async getMyIssues(maxResults = 20): Promise<JiraIssue[]> {
-    const jql = 'assignee = currentUser() AND status != Done ORDER BY updated DESC';
+    // Use statusCategory instead of status to handle different status names across Jira instances
+    // statusCategory groups statuses: "To Do", "In Progress", "Done" (regardless of actual status name)
+    const jql = 'assignee = currentUser() AND statusCategory != Done ORDER BY updated DESC';
     // Include customfield_10278 (customer) and timetracking (estimates)
     const fields = 'summary,status,issuetype,priority,assignee,project,updated,created,customfield_10278,timetracking';
 
