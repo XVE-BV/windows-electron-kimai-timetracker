@@ -11,6 +11,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 import { mainConfig } from './webpack.main.config';
 import { rendererConfig } from './webpack.renderer.config';
+import { preloadConfig } from './webpack.preload.config';
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -62,6 +63,7 @@ const config: ForgeConfig = {
             name: 'main_window',
             preload: {
               js: './src/preload.ts',
+              config: preloadConfig,
             },
           },
         ],
