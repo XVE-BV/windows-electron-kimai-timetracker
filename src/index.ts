@@ -31,7 +31,7 @@ declare const MAIN_WINDOW_WEBPACK_ENTRY: string;
 declare const MAIN_WINDOW_PRELOAD_WEBPACK_ENTRY: string;
 
 // Handle creating/removing shortcuts on Windows when installing/uninstalling.
-if (require('electron-squirrel-startup')) {
+if (process.platform === 'win32' && require('electron-squirrel-startup')) {
   app.quit();
 }
 
@@ -74,18 +74,35 @@ let remindersEnabled = true;
 let reminderInterval: NodeJS.Timeout | null = null;
 
 function createTrayIcon(): Electron.NativeImage {
+  // Use platform-appropriate icon format
+  const isMac = process.platform === 'darwin';
+  const iconExt = isMac ? 'png' : 'ico';
+  const iconFile = `favicon.${iconExt}`;
+
   // Try multiple paths for development and production
   const possiblePaths = [
-    path.join(__dirname, 'assets', 'favicon.ico'),        // Webpack dev build
-    path.join(__dirname, '..', 'assets', 'favicon.ico'),  // Alternative dev path
-    path.join(process.resourcesPath, 'assets', 'favicon.ico'),  // Production (extraResource)
-    path.join(app.getAppPath(), 'src', 'assets', 'favicon.ico'),  // App path
+    path.join(__dirname, 'assets', iconFile),        // Webpack dev build
+    path.join(__dirname, '..', 'assets', iconFile),  // Alternative dev path
+    path.join(process.resourcesPath, 'assets', iconFile),  // Production (extraResource)
+    path.join(app.getAppPath(), 'src', 'assets', iconFile),  // App path
+    // Fallback to ico on macOS if png not found
+    ...(isMac ? [
+      path.join(__dirname, 'assets', 'favicon.ico'),
+      path.join(__dirname, '..', 'assets', 'favicon.ico'),
+      path.join(process.resourcesPath, 'assets', 'favicon.ico'),
+      path.join(app.getAppPath(), 'src', 'assets', 'favicon.ico'),
+    ] : []),
   ];
 
   for (const iconPath of possiblePaths) {
     try {
       if (fs.existsSync(iconPath)) {
-        return nativeImage.createFromPath(iconPath);
+        const icon = nativeImage.createFromPath(iconPath);
+        // For macOS tray, resize to 16x16 (template size)
+        if (isMac && !icon.isEmpty()) {
+          return icon.resize({ width: 16, height: 16 });
+        }
+        return icon;
       }
     } catch (error) {
       // Try next path
@@ -621,62 +638,114 @@ function setupIPC(): void {
   // Debug
   ipcMain.handle(IPC_CHANNELS.DEBUG_GET_PROCESSES, async () => {
     const currentPid = process.pid;
+    const isWindows = process.platform === 'win32';
 
     return new Promise((resolve) => {
-      // Use WMI to get processes with command lines - filter for main processes only
-      // Electron child processes have --type= in their command line (renderer, gpu, utility, etc.)
-      const cmd = `powershell -Command "Get-CimInstance Win32_Process | Where-Object {$_.Name -match 'kimai|electron'} | Select-Object ProcessId,Name,WorkingSetSize,CommandLine | ConvertTo-Json"`;
+      if (isWindows) {
+        // Use WMI to get processes with command lines - filter for main processes only
+        // Electron child processes have --type= in their command line (renderer, gpu, utility, etc.)
+        const cmd = `powershell -Command "Get-CimInstance Win32_Process | Where-Object {$_.Name -match 'kimai|electron'} | Select-Object ProcessId,Name,WorkingSetSize,CommandLine | ConvertTo-Json"`;
 
-      exec(cmd, (error: Error | null, stdout: string) => {
-        if (error) {
-          addLog('error', `Failed to get processes: ${error.message}`);
-          resolve([]);
-          return;
-        }
-
-        try {
-          let processes = JSON.parse(stdout || '[]');
-          // Handle single process (not array)
-          if (!Array.isArray(processes)) {
-            processes = [processes];
+        exec(cmd, (error: Error | null, stdout: string) => {
+          if (error) {
+            addLog('error', `Failed to get processes: ${error.message}`);
+            resolve([]);
+            return;
           }
 
-          const result = processes
-            .filter((p: { Name: string; CommandLine: string | null }) => {
-              const name = p.Name?.toLowerCase() || '';
-              const cmdLine = p.CommandLine || '';
+          try {
+            let processes = JSON.parse(stdout || '[]');
+            // Handle single process (not array)
+            if (!Array.isArray(processes)) {
+              processes = [processes];
+            }
 
-              // Must be electron or kimai process
-              if (!name.includes('kimai') && name !== 'electron.exe') {
-                return false;
-              }
+            const result = processes
+              .filter((p: { Name: string; CommandLine: string | null }) => {
+                const name = p.Name?.toLowerCase() || '';
+                const cmdLine = p.CommandLine || '';
 
-              // Filter out Electron child processes (they have --type= argument)
-              // Main processes don't have this
-              if (cmdLine.includes('--type=')) {
-                return false;
-              }
+                // Must be electron or kimai process
+                if (!name.includes('kimai') && name !== 'electron.exe') {
+                  return false;
+                }
 
-              return true;
-            })
-            .map((p: { ProcessId: number; Name: string; WorkingSetSize: number }) => ({
-              pid: p.ProcessId,
-              name: p.Name,
-              memory: p.WorkingSetSize || 0,
-              isCurrent: p.ProcessId === currentPid,
-            }));
+                // Filter out Electron child processes (they have --type= argument)
+                // Main processes don't have this
+                if (cmdLine.includes('--type=')) {
+                  return false;
+                }
 
-          resolve(result);
-        } catch (parseError) {
-          addLog('error', `Failed to parse process list: ${parseError}`);
-          resolve([]);
-        }
-      });
+                return true;
+              })
+              .map((p: { ProcessId: number; Name: string; WorkingSetSize: number }) => ({
+                pid: p.ProcessId,
+                name: p.Name,
+                memory: p.WorkingSetSize || 0,
+                isCurrent: p.ProcessId === currentPid,
+              }));
+
+            resolve(result);
+          } catch (parseError) {
+            addLog('error', `Failed to parse process list: ${parseError}`);
+            resolve([]);
+          }
+        });
+      } else {
+        // macOS/Linux: Use ps command
+        const cmd = `ps aux | grep -i -E 'kimai|electron' | grep -v grep`;
+
+        exec(cmd, (error: Error | null, stdout: string) => {
+          if (error) {
+            // grep returns exit code 1 when no matches found
+            if (error.message.includes('exit code 1')) {
+              resolve([]);
+              return;
+            }
+            addLog('error', `Failed to get processes: ${error.message}`);
+            resolve([]);
+            return;
+          }
+
+          try {
+            const lines = stdout.trim().split('\n').filter(Boolean);
+            const result = lines
+              .map((line: string) => {
+                const parts = line.trim().split(/\s+/);
+                const pid = parseInt(parts[1], 10);
+                const memory = parseInt(parts[5], 10) * 1024; // RSS in KB -> bytes
+                const name = parts.slice(10).join(' ').split('/').pop() || 'Unknown';
+                const cmdLine = parts.slice(10).join(' ');
+
+                return { pid, name, memory, cmdLine };
+              })
+              .filter((p: { pid: number; name: string; memory: number; cmdLine: string }) => {
+                // Filter out Electron child processes (they have --type= argument)
+                if (p.cmdLine.includes('--type=')) {
+                  return false;
+                }
+                return true;
+              })
+              .map((p: { pid: number; name: string; memory: number }) => ({
+                pid: p.pid,
+                name: p.name,
+                memory: p.memory,
+                isCurrent: p.pid === currentPid,
+              }));
+
+            resolve(result);
+          } catch (parseError) {
+            addLog('error', `Failed to parse process list: ${parseError}`);
+            resolve([]);
+          }
+        });
+      }
     });
   });
 
   ipcMain.handle(IPC_CHANNELS.DEBUG_KILL_PROCESS, async (_, pid: number) => {
     const currentPid = process.pid;
+    const isWindows = process.platform === 'win32';
 
     if (pid === currentPid) {
       addLog('warn', 'Attempted to kill current process - ignored');
@@ -684,7 +753,9 @@ function setupIPC(): void {
     }
 
     return new Promise((resolve) => {
-      exec(`taskkill /PID ${pid} /F`, (error: Error | null) => {
+      const cmd = isWindows ? `taskkill /PID ${pid} /F` : `kill -9 ${pid}`;
+
+      exec(cmd, (error: Error | null) => {
         if (error) {
           addLog('error', `Failed to kill PID ${pid}: ${error.message}`);
           resolve({ success: false, message: error.message });
