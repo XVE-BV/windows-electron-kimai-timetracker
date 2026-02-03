@@ -1,4 +1,5 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
+import { execSync } from 'child_process';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDMG } from '@electron-forge/maker-dmg';
@@ -20,8 +21,25 @@ const config: ForgeConfig = {
     executableName: 'kimai-timetracker',
     icon: './src/assets/favicon',
     extraResource: ['./src/assets'],
+    // Note: macOS requires ad-hoc signing for Keychain access
+    // Run after build: codesign -f -s - --deep "out/Kimai Time Tracker-darwin-arm64/Kimai Time Tracker.app"
   },
   rebuildConfig: {},
+  hooks: {
+    postPackage: async (config, options) => {
+      // Ad-hoc sign macOS apps for Keychain access (safeStorage)
+      if (options.platform === 'darwin') {
+        const appPath = `${options.outputPaths[0]}/${config.packagerConfig.name}.app`;
+        console.log(`Ad-hoc signing: ${appPath}`);
+        try {
+          execSync(`codesign -f -s - --deep "${appPath}"`, { stdio: 'inherit' });
+          console.log('Ad-hoc signing complete');
+        } catch (error) {
+          console.error('Ad-hoc signing failed:', error);
+        }
+      }
+    },
+  },
   makers: [
     new MakerSquirrel({
       name: 'KimaiTimeTracker',

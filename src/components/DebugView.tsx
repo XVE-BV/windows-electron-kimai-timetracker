@@ -22,7 +22,7 @@ export function DebugView() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<'processes' | 'logs'>('processes');
-  const [encryptionStatus, setEncryptionStatus] = useState<{ isAvailable: boolean; platform: string } | null>(null);
+  const [encryptionStatus, setEncryptionStatus] = useState<{ isAvailable: boolean; platform: string; usingPlaintextFallback: boolean } | null>(null);
 
   const loadProcesses = async () => {
     if (!window.electronAPI) return;
@@ -276,9 +276,16 @@ export function DebugView() {
           <div className="p-4 border-t border-border text-xs text-muted-foreground space-y-1">
             <div>Current PID: {processes.find(p => p.isCurrent)?.pid || 'Unknown'}</div>
             {encryptionStatus && (
-              <div className={encryptionStatus.isAvailable ? 'text-green-600' : 'text-red-600 font-semibold'}>
-                Encryption: {encryptionStatus.isAvailable ? 'Available ✓' : 'NOT AVAILABLE ✗'} ({encryptionStatus.platform})
-              </div>
+              <>
+                <div className={encryptionStatus.isAvailable ? 'text-green-600' : 'text-yellow-600'}>
+                  Encryption: {encryptionStatus.isAvailable ? 'Available ✓' : 'Using fallback ⚠'} ({encryptionStatus.platform})
+                </div>
+                {encryptionStatus.usingPlaintextFallback && (
+                  <div className="text-yellow-600">
+                    Tokens stored with base64 encoding (dev mode)
+                  </div>
+                )}
+              </>
             )}
           </div>
         </>

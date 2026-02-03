@@ -178,7 +178,7 @@ export interface ElectronAPI {
   openDebug: () => Promise<void>;
   openTimeRounding: () => Promise<void>;
   openDevTools: () => Promise<void>;
-  getEncryptionStatus: () => Promise<{ isAvailable: boolean; platform: string }>;
+  getEncryptionStatus: () => Promise<{ isAvailable: boolean; platform: string; usingPlaintextFallback: boolean }>;
   didCredentialsNeedReentry: () => Promise<boolean>;
   showNotification: (title: string, body: string) => Promise<void>;
   getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;

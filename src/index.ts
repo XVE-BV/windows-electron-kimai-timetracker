@@ -1,4 +1,4 @@
-import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell, net, screen, nativeTheme } from 'electron';
+import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, shell, net, screen, nativeTheme, safeStorage } from 'electron';
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
@@ -12,6 +12,7 @@ import {
   updateTimerState,
   didDecryptionFail,
   clearDecryptionFailedFlag,
+  isUsingPlaintextFallback,
 } from './services/store';
 import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ThemeMode, JiraIssue } from './types';
 import {
@@ -800,6 +801,7 @@ function setupIPC(): void {
     return {
       isAvailable: safeStorage.isEncryptionAvailable(),
       platform: process.platform,
+      usingPlaintextFallback: isUsingPlaintextFallback(),
     };
   });
 

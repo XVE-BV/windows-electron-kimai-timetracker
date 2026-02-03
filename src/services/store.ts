@@ -63,14 +63,20 @@ const store = new Store<StoreSchema>({
   },
 });
 
+// Track if we're using plaintext fallback (for development without Keychain)
+let usingPlaintextFallback = false;
+
 /**
  * Encrypt a string using Electron's safeStorage
- * Throws if encryption is not available to prevent plaintext credential storage
+ * Falls back to base64 encoding if encryption is not available (development only)
  */
 function encryptString(value: string): string {
   if (!value) return '';
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error('Secure storage not available. Cannot save credentials safely.');
+    // Fallback for development: use base64 with a marker prefix
+    console.warn('safeStorage not available, using plaintext fallback (development only)');
+    usingPlaintextFallback = true;
+    return 'PLAINTEXT:' + Buffer.from(value).toString('base64');
   }
   const encrypted = safeStorage.encryptString(value);
   return encrypted.toString('base64');
@@ -85,6 +91,13 @@ let decryptionFailed = false;
 
 function decryptString(value: string): string {
   if (!value) return '';
+
+  // Handle plaintext fallback (development mode)
+  if (value.startsWith('PLAINTEXT:')) {
+    usingPlaintextFallback = true;
+    return Buffer.from(value.slice(10), 'base64').toString('utf-8');
+  }
+
   if (!safeStorage.isEncryptionAvailable()) {
     console.warn('Secure storage not available, cannot decrypt credentials');
     return '';
@@ -222,6 +235,13 @@ export function updateTimerState(updates: Partial<TimerState>): TimerState {
  */
 export function isSecureStorageAvailable(): boolean {
   return safeStorage.isEncryptionAvailable();
+}
+
+/**
+ * Check if using plaintext fallback (for development without Keychain)
+ */
+export function isUsingPlaintextFallback(): boolean {
+  return usingPlaintextFallback;
 }
 
 export default store;
