@@ -10,6 +10,8 @@ import {
   saveSettings,
   getTimerState,
   updateTimerState,
+  didDecryptionFail,
+  clearDecryptionFailedFlag,
 } from './services/store';
 import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ThemeMode, JiraIssue } from './types';
 import {
@@ -489,6 +491,8 @@ function setupIPC(): void {
     try {
       const validatedSettings = validateAppSettings(settings);
       saveSettings(validatedSettings);
+      // Clear decryption failed flag since credentials were re-saved
+      clearDecryptionFailedFlag();
       // Invalidate cached data since API credentials may have changed
       cachedProjects = [];
       cachedActivities = [];
@@ -785,6 +789,24 @@ function setupIPC(): void {
     navigateTrayWindow(VIEW_HASHES.TIME_ROUNDING);
   });
 
+  ipcMain.handle(IPC_CHANNELS.OPEN_DEVTOOLS, () => {
+    if (trayWindow && !trayWindow.isDestroyed()) {
+      trayWindow.webContents.openDevTools();
+    }
+  });
+
+  ipcMain.handle(IPC_CHANNELS.GET_ENCRYPTION_STATUS, () => {
+    const { safeStorage } = require('electron');
+    return {
+      isAvailable: safeStorage.isEncryptionAvailable(),
+      platform: process.platform,
+    };
+  });
+
+  ipcMain.handle(IPC_CHANNELS.DID_CREDENTIALS_NEED_REENTRY, () => {
+    return didDecryptionFail();
+  });
+
   // Notifications
   ipcMain.handle(IPC_CHANNELS.SHOW_NOTIFICATION, (_, title: string, body: string) => {
     showNotification(title, body);
@@ -850,7 +872,17 @@ async function initializeApp(): Promise<void> {
   // Setup IPC handlers FIRST (before any windows load)
   setupIPC();
 
-  // Apply saved theme setting
+  // Create tray
+  const icon = createTrayIcon();
+  tray = new Tray(icon);
+  tray.setToolTip('Kimai Time Tracker');
+
+  // Create tray popup window BEFORE accessing safeStorage
+  // On macOS, safeStorage requires a BrowserWindow to exist first
+  // See: https://github.com/electron/electron/issues/34614
+  createTrayWindow();
+
+  // Apply saved theme setting (now safe to call getSettings which uses safeStorage)
   const settings = getSettings();
   nativeTheme.themeSource = settings.themeMode || 'system';
 
@@ -862,14 +894,6 @@ async function initializeApp(): Promise<void> {
       win.webContents.send('theme-changed', shouldUseDark);
     });
   });
-
-  // Create tray
-  const icon = createTrayIcon();
-  tray = new Tray(icon);
-  tray.setToolTip('Kimai Time Tracker');
-
-  // Create tray popup window
-  createTrayWindow();
 
   // Handle tray clicks
   tray.on('click', () => {

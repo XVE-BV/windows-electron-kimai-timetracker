@@ -265,6 +265,13 @@ export const IPC_CHANNELS = {
 
   // Notifications
   SHOW_NOTIFICATION: 'show-notification',
+
+  // DevTools
+  OPEN_DEVTOOLS: 'open-devtools',
+
+  // Encryption status
+  GET_ENCRYPTION_STATUS: 'get-encryption-status',
+  DID_CREDENTIALS_NEED_REENTRY: 'did-credentials-need-reentry',
 } as const;
 
 // QR Code Payload for Mobile App Setup

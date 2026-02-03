@@ -79,7 +79,10 @@ function encryptString(value: string): string {
 /**
  * Decrypt a string using Electron's safeStorage
  * Returns empty string if decryption fails for security
+ * Sets flag if decryption failed (likely due to app identity change)
  */
+let decryptionFailed = false;
+
 function decryptString(value: string): string {
   if (!value) return '';
   if (!safeStorage.isEncryptionAvailable()) {
@@ -90,10 +93,25 @@ function decryptString(value: string): string {
     const buffer = Buffer.from(value, 'base64');
     return safeStorage.decryptString(buffer);
   } catch (error) {
-    // Decryption failed - return empty for security (don't leak potentially corrupted data)
-    console.warn('Failed to decrypt credential, returning empty string');
+    // Decryption failed - likely app identity changed (dev vs prod build)
+    console.warn('Failed to decrypt credential - app identity may have changed');
+    decryptionFailed = true;
     return '';
   }
+}
+
+/**
+ * Check if decryption failed (useful for showing re-auth prompt)
+ */
+export function didDecryptionFail(): boolean {
+  return decryptionFailed;
+}
+
+/**
+ * Clear the decryption failed flag after user re-enters credentials
+ */
+export function clearDecryptionFailedFlag(): void {
+  decryptionFailed = false;
 }
 
 export function getSettings(): AppSettings {
@@ -118,6 +136,13 @@ export function getSettings(): AppSettings {
       }
       if (encryptedTokens.jiraToken && settings.jira) {
         settings.jira.apiToken = decryptString(encryptedTokens.jiraToken);
+      }
+
+      // If decryption failed, clear the invalid encrypted tokens
+      // so they can be re-saved with the new app identity
+      if (decryptionFailed) {
+        console.warn('Clearing encrypted tokens due to decryption failure (app identity changed)');
+        store.delete('encryptedTokens');
       }
     }
   } catch (error) {
