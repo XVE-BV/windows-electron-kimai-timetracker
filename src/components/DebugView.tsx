@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Trash2, AlertTriangle, Bug, Copy, Check, ArrowLeft, Terminal } from 'lucide-react';
+import { RefreshCw, Trash2, AlertTriangle, Bug, Copy, Check, ArrowLeft, Terminal, Bell } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface ProcessInfo {
@@ -139,6 +139,14 @@ export function DebugView() {
             <h1 className="text-lg font-semibold">Debug View</h1>
           </div>
           <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => window.electronAPI?.showNotification('Test Notification', 'Notifications are working!')}
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              Test
+            </Button>
             <Button
               variant="secondary"
               size="sm"

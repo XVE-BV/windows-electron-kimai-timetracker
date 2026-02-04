@@ -2,7 +2,7 @@ import { app, BrowserWindow, Tray, Menu, nativeImage, ipcMain, Notification, she
 import * as path from 'path';
 import * as fs from 'fs';
 import { exec } from 'child_process';
-import { kimaiAPI } from './services/kimai';
+import { kimaiAPI, KimaiAPI } from './services/kimai';
 import { activityWatchAPI } from './services/activitywatch';
 import { jiraAPI } from './services/jira';
 import {
@@ -366,8 +366,15 @@ function toggleReminders(): boolean {
 }
 
 function showNotification(title: string, body: string): void {
+  console.log('[notification] isSupported:', Notification.isSupported());
+  console.log('[notification] Showing:', title, body);
   if (Notification.isSupported()) {
-    new Notification({ title, body }).show();
+    const notification = new Notification({ title, body });
+    notification.show();
+    notification.on('show', () => console.log('[notification] Shown successfully'));
+    notification.on('failed', (e) => console.error('[notification] Failed:', e));
+  } else {
+    console.warn('[notification] Notifications not supported on this platform');
   }
 }
 
@@ -545,8 +552,14 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.KIMAI_UPDATE_DESCRIPTION, async (_, id: unknown, description: unknown) => {
     const validId = validateStrictPositiveInt(id, 'id');
     const validDescription = validateOptionalString(description, 'description') || '';
-    const result = await kimaiAPI.updateTimesheet(validId, { description: validDescription });
-    // Update local timer state description
+    // Add tracking prefix if timer is running for this timesheet
+    const timerState = getTimerState();
+    const isTracking = timerState.isRunning && timerState.currentTimesheetId === validId;
+    const finalDescription = isTracking
+      ? KimaiAPI.addTrackingPrefix(validDescription)
+      : validDescription;
+    const result = await kimaiAPI.updateTimesheet(validId, { description: finalDescription });
+    // Update local timer state description (without prefix)
     updateTimerState({ description: validDescription });
     return result;
   });
