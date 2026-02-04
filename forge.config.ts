@@ -1,4 +1,5 @@
 import type { ForgeConfig } from '@electron-forge/shared-types';
+import { execSync } from 'child_process';
 import { MakerSquirrel } from '@electron-forge/maker-squirrel';
 import { MakerZIP } from '@electron-forge/maker-zip';
 import { MakerDMG } from '@electron-forge/maker-dmg';
@@ -11,6 +12,7 @@ import { FuseV1Options, FuseVersion } from '@electron/fuses';
 
 import { mainConfig } from './webpack.main.config';
 import { rendererConfig } from './webpack.renderer.config';
+import { preloadConfig } from './webpack.preload.config';
 
 const config: ForgeConfig = {
   packagerConfig: {
@@ -19,8 +21,25 @@ const config: ForgeConfig = {
     executableName: 'kimai-timetracker',
     icon: './src/assets/favicon',
     extraResource: ['./src/assets'],
+    // Note: macOS requires ad-hoc signing for Keychain access
+    // Run after build: codesign -f -s - --deep "out/Kimai Time Tracker-darwin-arm64/Kimai Time Tracker.app"
   },
   rebuildConfig: {},
+  hooks: {
+    postPackage: async (config, options) => {
+      // Ad-hoc sign macOS apps for Keychain access (safeStorage)
+      if (options.platform === 'darwin') {
+        const appPath = `${options.outputPaths[0]}/${config.packagerConfig.name}.app`;
+        console.log(`Ad-hoc signing: ${appPath}`);
+        try {
+          execSync(`codesign -f -s - --deep "${appPath}"`, { stdio: 'inherit' });
+          console.log('Ad-hoc signing complete');
+        } catch (error) {
+          console.error('Ad-hoc signing failed:', error);
+        }
+      }
+    },
+  },
   makers: [
     new MakerSquirrel({
       name: 'KimaiTimeTracker',
@@ -62,6 +81,7 @@ const config: ForgeConfig = {
             name: 'main_window',
             preload: {
               js: './src/preload.ts',
+              config: preloadConfig,
             },
           },
         ],
@@ -69,15 +89,20 @@ const config: ForgeConfig = {
     }),
     // Fuses are used to enable/disable various Electron functionality
     // at package time, before code signing the application
-    new FusesPlugin({
-      version: FuseVersion.V1,
-      [FuseV1Options.RunAsNode]: false,
-      [FuseV1Options.EnableCookieEncryption]: true,
-      [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
-      [FuseV1Options.EnableNodeCliInspectArguments]: false,
-      [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
-      [FuseV1Options.OnlyLoadAppFromAsar]: true,
-    }),
+    // NOTE: Disabled on macOS due to notification issues
+    ...(process.platform !== 'darwin'
+      ? [
+          new FusesPlugin({
+            version: FuseVersion.V1,
+            [FuseV1Options.RunAsNode]: false,
+            [FuseV1Options.EnableCookieEncryption]: true,
+            [FuseV1Options.EnableNodeOptionsEnvironmentVariable]: false,
+            [FuseV1Options.EnableNodeCliInspectArguments]: false,
+            [FuseV1Options.EnableEmbeddedAsarIntegrityValidation]: true,
+            [FuseV1Options.OnlyLoadAppFromAsar]: true,
+          }),
+        ]
+      : []),
   ],
 };
 

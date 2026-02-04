@@ -158,6 +158,21 @@ class KimaiAPI {
     return this.request<KimaiTimesheet>('PATCH', `/timesheets/${id}/stop`);
   }
 
+  static readonly TRACKING_PREFIX = '⏱️ ';
+
+  // Add tracking prefix to description (strips existing prefix first to avoid duplicates)
+  static addTrackingPrefix(description: string): string {
+    const stripped = KimaiAPI.stripTrackingPrefix(description);
+    return KimaiAPI.TRACKING_PREFIX + stripped;
+  }
+
+  // Remove tracking prefix from description
+  static stripTrackingPrefix(description: string): string {
+    return description.startsWith(KimaiAPI.TRACKING_PREFIX)
+      ? description.slice(KimaiAPI.TRACKING_PREFIX.length)
+      : description;
+  }
+
   async startTimer(
     projectId: number,
     activityId: number,
@@ -169,23 +184,38 @@ class KimaiAPI {
     now.setMinutes(roundedMinutes, 0, 0);
     const begin = this.formatDateTime(now);
 
+    // Add tracking prefix to description
+    const prefixedDescription = KimaiAPI.addTrackingPrefix(description || '');
+
     return this.createTimesheet({
       begin,
       project: projectId,
       activity: activityId,
-      description: description || '',
+      description: prefixedDescription,
     });
   }
 
   async stopTimer(timesheetId: number): Promise<KimaiTimesheet> {
-    // Round end time to nearest 15-minute interval
+    // Round end time to NEAREST 15-minute interval
     const now = new Date();
     const roundedMinutes = Math.round(now.getMinutes() / 15) * 15;
     now.setMinutes(roundedMinutes, 0, 0);
-    // Handle overflow when rounding 53-59 minutes → 60 → next hour
-    const end = this.formatDateTime(now);
 
-    return this.updateTimesheet(timesheetId, { end });
+    // Safety check: ensure end time is after start time
+    // (handles case where timesheet was manually edited in Kimai)
+    const timesheet = await this.request<KimaiTimesheet>('GET', `/timesheets/${timesheetId}`);
+    const startTime = new Date(timesheet.begin);
+    if (now <= startTime) {
+      // End would be before/equal to start, round up instead
+      now.setTime(startTime.getTime());
+      now.setMinutes(Math.ceil(startTime.getMinutes() / 15) * 15 + 15, 0, 0);
+    }
+
+    // Remove tracking prefix from description
+    const description = KimaiAPI.stripTrackingPrefix(timesheet.description || '');
+
+    const end = this.formatDateTime(now);
+    return this.updateTimesheet(timesheetId, { end, description });
   }
 
   async updateTimesheet(id: number, data: Partial<KimaiTimesheetCreate> & { end?: string }): Promise<KimaiTimesheet> {
@@ -208,4 +238,5 @@ class KimaiAPI {
 }
 
 export const kimaiAPI = new KimaiAPI();
+export { KimaiAPI };
 export default kimaiAPI;
