@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Settings, Link, Activity, CheckCircle, XCircle, Loader2, Ticket, ArrowLeft } from 'lucide-react';
+import { Settings, Link, Activity, CheckCircle, XCircle, Loader2, Ticket, ArrowLeft, AlertTriangle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -40,6 +40,7 @@ export function SettingsView() {
   const [projects, setProjects] = useState<KimaiProject[]>([]);
   const [activities, setActivities] = useState<KimaiActivity[]>([]);
   const [favoriteCustomerIds, setFavoriteCustomerIds] = useState<number[]>([]);
+  const [credentialsNeedReentry, setCredentialsNeedReentry] = useState(false);
 
   // Check if running in Electron
   const isElectron = typeof window !== 'undefined' && window.electronAPI;
@@ -53,6 +54,10 @@ export function SettingsView() {
   const loadSettings = async () => {
     if (!window.electronAPI) return;
     try {
+      // Check if credentials need to be re-entered (app identity changed)
+      const needsReentry = await window.electronAPI.didCredentialsNeedReentry();
+      setCredentialsNeedReentry(needsReentry);
+
       const s = await window.electronAPI.getSettings();
       setSettings(s);
       setKimaiUrl(s.kimai.apiUrl);
@@ -298,6 +303,19 @@ export function SettingsView() {
           <p className="text-xs text-muted-foreground">Configure your time tracking</p>
         </div>
       </div>
+
+      {/* Credentials Re-entry Warning */}
+      {credentialsNeedReentry && (
+        <div className="p-3 bg-yellow-500/10 border border-yellow-500/30 rounded-lg flex items-start gap-3 mb-4">
+          <AlertTriangle className="h-5 w-5 text-yellow-600 flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-medium text-yellow-700">API tokens need to be re-entered</p>
+            <p className="text-xs text-yellow-600 mt-1">
+              The app was updated or reinstalled. Please re-enter your API tokens and save settings.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Kimai Connection */}
       <Card>

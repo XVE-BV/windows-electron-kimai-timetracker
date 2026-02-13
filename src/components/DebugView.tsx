@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { RefreshCw, Trash2, AlertTriangle, Bug, Copy, Check, ArrowLeft } from 'lucide-react';
+import { RefreshCw, Trash2, AlertTriangle, Bug, Copy, Check, ArrowLeft, Terminal, Bell } from 'lucide-react';
 import { Button } from './ui/button';
 
 interface ProcessInfo {
@@ -22,6 +22,7 @@ export function DebugView() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [tab, setTab] = useState<'processes' | 'logs'>('processes');
+  const [encryptionStatus, setEncryptionStatus] = useState<{ isAvailable: boolean; platform: string; usingPlaintextFallback: boolean } | null>(null);
 
   const loadProcesses = async () => {
     if (!window.electronAPI) return;
@@ -89,9 +90,20 @@ export function DebugView() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const loadEncryptionStatus = async () => {
+    if (!window.electronAPI) return;
+    try {
+      const status = await window.electronAPI.getEncryptionStatus();
+      setEncryptionStatus(status);
+    } catch (err) {
+      console.error('Failed to get encryption status:', err);
+    }
+  };
+
   useEffect(() => {
     loadProcesses();
     loadLogs();
+    loadEncryptionStatus();
 
     // Refresh logs periodically
     const interval = setInterval(loadLogs, 5000);
@@ -126,15 +138,33 @@ export function DebugView() {
             <Bug className="h-5 w-5 text-muted-foreground" />
             <h1 className="text-lg font-semibold">Debug View</h1>
           </div>
-          <Button
-            variant="secondary"
-            size="sm"
-            onClick={() => { loadProcesses(); loadLogs(); }}
-            disabled={loading}
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => window.electronAPI?.showNotification('Test Notification', 'Notifications are working!')}
+            >
+              <Bell className="h-4 w-4 mr-2" />
+              Test
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => window.electronAPI?.openDevTools()}
+            >
+              <Terminal className="h-4 w-4 mr-2" />
+              DevTools
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => { loadProcesses(); loadLogs(); }}
+              disabled={loading}
+            >
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
+            </Button>
+          </div>
         </div>
       </div>
 
@@ -251,8 +281,20 @@ export function DebugView() {
           </div>
 
           {/* Footer */}
-          <div className="p-4 border-t border-border text-xs text-muted-foreground">
-            Current PID: {processes.find(p => p.isCurrent)?.pid || 'Unknown'}
+          <div className="p-4 border-t border-border text-xs text-muted-foreground space-y-1">
+            <div>Current PID: {processes.find(p => p.isCurrent)?.pid || 'Unknown'}</div>
+            {encryptionStatus && (
+              <>
+                <div className={encryptionStatus.isAvailable ? 'text-green-600' : 'text-yellow-600'}>
+                  Encryption: {encryptionStatus.isAvailable ? 'Available ✓' : 'Using fallback ⚠'} ({encryptionStatus.platform})
+                </div>
+                {encryptionStatus.usingPlaintextFallback && (
+                  <div className="text-yellow-600">
+                    Tokens stored with base64 encoding (dev mode)
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </>
       )}

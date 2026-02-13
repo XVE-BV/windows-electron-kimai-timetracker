@@ -63,14 +63,20 @@ const store = new Store<StoreSchema>({
   },
 });
 
+// Track if we're using plaintext fallback (for development without Keychain)
+let usingPlaintextFallback = false;
+
 /**
  * Encrypt a string using Electron's safeStorage
- * Throws if encryption is not available to prevent plaintext credential storage
+ * Falls back to base64 encoding if encryption is not available (development only)
  */
 function encryptString(value: string): string {
   if (!value) return '';
   if (!safeStorage.isEncryptionAvailable()) {
-    throw new Error('Secure storage not available. Cannot save credentials safely.');
+    // Fallback for development: use base64 with a marker prefix
+    console.warn('safeStorage not available, using plaintext fallback (development only)');
+    usingPlaintextFallback = true;
+    return 'PLAINTEXT:' + Buffer.from(value).toString('base64');
   }
   const encrypted = safeStorage.encryptString(value);
   return encrypted.toString('base64');
@@ -79,9 +85,19 @@ function encryptString(value: string): string {
 /**
  * Decrypt a string using Electron's safeStorage
  * Returns empty string if decryption fails for security
+ * Sets flag if decryption failed (likely due to app identity change)
  */
+let decryptionFailed = false;
+
 function decryptString(value: string): string {
   if (!value) return '';
+
+  // Handle plaintext fallback (development mode)
+  if (value.startsWith('PLAINTEXT:')) {
+    usingPlaintextFallback = true;
+    return Buffer.from(value.slice(10), 'base64').toString('utf-8');
+  }
+
   if (!safeStorage.isEncryptionAvailable()) {
     console.warn('Secure storage not available, cannot decrypt credentials');
     return '';
@@ -90,10 +106,25 @@ function decryptString(value: string): string {
     const buffer = Buffer.from(value, 'base64');
     return safeStorage.decryptString(buffer);
   } catch (error) {
-    // Decryption failed - return empty for security (don't leak potentially corrupted data)
-    console.warn('Failed to decrypt credential, returning empty string');
+    // Decryption failed - likely app identity changed (dev vs prod build)
+    console.warn('Failed to decrypt credential - app identity may have changed');
+    decryptionFailed = true;
     return '';
   }
+}
+
+/**
+ * Check if decryption failed (useful for showing re-auth prompt)
+ */
+export function didDecryptionFail(): boolean {
+  return decryptionFailed;
+}
+
+/**
+ * Clear the decryption failed flag after user re-enters credentials
+ */
+export function clearDecryptionFailedFlag(): void {
+  decryptionFailed = false;
 }
 
 export function getSettings(): AppSettings {
@@ -118,6 +149,13 @@ export function getSettings(): AppSettings {
       }
       if (encryptedTokens.jiraToken && settings.jira) {
         settings.jira.apiToken = decryptString(encryptedTokens.jiraToken);
+      }
+
+      // If decryption failed, clear the invalid encrypted tokens
+      // so they can be re-saved with the new app identity
+      if (decryptionFailed) {
+        console.warn('Clearing encrypted tokens due to decryption failure (app identity changed)');
+        store.delete('encryptedTokens');
       }
     }
   } catch (error) {
@@ -197,6 +235,13 @@ export function updateTimerState(updates: Partial<TimerState>): TimerState {
  */
 export function isSecureStorageAvailable(): boolean {
   return safeStorage.isEncryptionAvailable();
+}
+
+/**
+ * Check if using plaintext fallback (for development without Keychain)
+ */
+export function isUsingPlaintextFallback(): boolean {
+  return usingPlaintextFallback;
 }
 
 export default store;

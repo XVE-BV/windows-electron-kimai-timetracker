@@ -93,6 +93,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   debugClearLogs: () => ipcRenderer.invoke(IPC_CHANNELS.DEBUG_CLEAR_LOGS),
   openDebug: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_DEBUG),
   openTimeRounding: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_TIME_ROUNDING),
+  openDevTools: () => ipcRenderer.invoke(IPC_CHANNELS.OPEN_DEVTOOLS),
+  getEncryptionStatus: () => ipcRenderer.invoke(IPC_CHANNELS.GET_ENCRYPTION_STATUS),
+  didCredentialsNeedReentry: () => ipcRenderer.invoke(IPC_CHANNELS.DID_CREDENTIALS_NEED_REENTRY),
 
   // Notifications
   showNotification: (title: string, body: string) => ipcRenderer.invoke(IPC_CHANNELS.SHOW_NOTIFICATION, title, body),
@@ -174,6 +177,9 @@ export interface ElectronAPI {
   debugClearLogs: () => Promise<{ success: boolean }>;
   openDebug: () => Promise<void>;
   openTimeRounding: () => Promise<void>;
+  openDevTools: () => Promise<void>;
+  getEncryptionStatus: () => Promise<{ isAvailable: boolean; platform: string; usingPlaintextFallback: boolean }>;
+  didCredentialsNeedReentry: () => Promise<boolean>;
   showNotification: (title: string, body: string) => Promise<void>;
   getUpdateStatus: () => Promise<{ status: string; version?: string; error?: string }>;
   checkForUpdates: () => Promise<{ status: string; version?: string; error?: string }>;
