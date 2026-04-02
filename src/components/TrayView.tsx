@@ -197,9 +197,9 @@ export function TrayView() {
           const act = acts.find(a => a.id === state.activityId);
           setSelectedActivity(act || null);
         }
-      } else if (state.jiraIssue && state.customerId) {
-        // Timer not running but Jira issue selected - restore saved selections
-        const cust = custs.find(c => c.id === state.customerId);
+      } else if (state.jiraIssue) {
+        // Timer not running but Jira issue selected - restore saved selections (customerId may be null if no match was found)
+        const cust = state.customerId ? custs.find(c => c.id === state.customerId) : undefined;
         if (cust) {
           setSelectedCustomer(cust);
           setProjects(projs.filter(p => p.customer === cust.id));
@@ -561,11 +561,14 @@ export function TrayView() {
       // Try to match customfield_10278 (customer field) first
       const jiraCustomerName = (issue.fields.customfield_10278 as { value?: string } | undefined)?.value;
       const jiraProjectName = issue.fields.project?.name;
+      const jiraProjectKey = issue.fields.project?.key;
 
       let matchedCustomer: KimaiCustomer | undefined;
 
-      // Helper to find best matching customer (prefers longer names for more specific matches)
-      const findBestMatch = (searchTerm: string): KimaiCustomer | undefined => {
+      // Helper to find best matching customer (prefers longer names for more specific matches).
+      // When oneDirectional is true, only checks if the customer name contains the search term —
+      // the reverse arm is skipped to prevent short project keys from matching longer customer names.
+      const findBestMatch = (searchTerm: string, oneDirectional = false): KimaiCustomer | undefined => {
         const term = searchTerm.toLowerCase();
         // First try exact match
         const exact = customers.find(c => c.name.toLowerCase() === term);
@@ -573,7 +576,7 @@ export function TrayView() {
 
         // Find all partial matches and pick the longest (most specific)
         const partialMatches = customers.filter(c =>
-          c.name.toLowerCase().includes(term) || term.includes(c.name.toLowerCase())
+          c.name.toLowerCase().includes(term) || (!oneDirectional && term.includes(c.name.toLowerCase()))
         );
         if (partialMatches.length > 0) {
           // Sort by name length descending, pick longest
@@ -590,6 +593,13 @@ export function TrayView() {
       // Fallback to project name
       if (!matchedCustomer && jiraProjectName) {
         matchedCustomer = findBestMatch(jiraProjectName);
+      }
+
+      // Fallback to project key (e.g. "M18" key matches "M18 Executive Search" customer).
+      // Use one-directional matching so a short key like "M18" does not falsely match a
+      // customer named "M1" via the reverse arm term.includes(c.name).
+      if (!matchedCustomer && jiraProjectKey) {
+        matchedCustomer = findBestMatch(jiraProjectKey, true);
       }
 
       // Set the matched customer and load projects
