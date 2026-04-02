@@ -176,8 +176,6 @@ async function buildContextMenu(): Promise<Menu> {
     },
   }));
 
-  const elapsedTime = isRunning ? formatDurationCompact(getElapsedSeconds(activeTimers[0])) : '';
-
   const menuTemplate: Electron.MenuItemConstructorOptions[] = [
     // Timer Status
     {
@@ -629,11 +627,24 @@ function setupIPC(): void {
 
   // Timer Selections
   ipcMain.handle(IPC_CHANNELS.GET_TIMER_SELECTIONS, () => getTimerSelections());
-  ipcMain.handle(IPC_CHANNELS.SET_TIMER_SELECTIONS, (_, selections: Partial<TimerSelections>) => {
-    return updateTimerSelections(selections);
+  ipcMain.handle(IPC_CHANNELS.SET_TIMER_SELECTIONS, (_, selections: unknown) => {
+    if (!selections || typeof selections !== 'object') {
+      throw new Error('selections must be an object');
+    }
+    const sel = selections as Record<string, unknown>;
+    const validated: Partial<TimerSelections> = {};
+    if ('customerId' in sel) validated.customerId = sel.customerId === null ? null : validateOptionalPositiveInt(sel.customerId, 'customerId') ?? null;
+    if ('projectId' in sel) validated.projectId = sel.projectId === null ? null : validateOptionalPositiveInt(sel.projectId, 'projectId') ?? null;
+    if ('activityId' in sel) validated.activityId = sel.activityId === null ? null : validateOptionalPositiveInt(sel.activityId, 'activityId') ?? null;
+    if ('description' in sel) validated.description = validateOptionalString(sel.description, 'description') || '';
+    if ('jiraIssue' in sel) validated.jiraIssue = sel.jiraIssue === null ? null : sel.jiraIssue as JiraIssue;
+    return updateTimerSelections(validated);
   });
-  ipcMain.handle(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, (_, jiraIssue: JiraIssue | null) => {
-    return updateTimerSelections({ jiraIssue });
+  ipcMain.handle(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, (_, jiraIssue: unknown) => {
+    if (jiraIssue !== null && (typeof jiraIssue !== 'object' || !jiraIssue)) {
+      throw new Error('jiraIssue must be an object or null');
+    }
+    return updateTimerSelections({ jiraIssue: jiraIssue as JiraIssue | null });
   });
 
   // Work Session

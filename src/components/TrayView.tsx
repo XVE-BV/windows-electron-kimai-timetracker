@@ -21,6 +21,7 @@ export function TrayView() {
   const [allProjects, setAllProjects] = useState<KimaiProject[]>([]);
   const [activities, setActivities] = useState<KimaiActivity[]>([]);
   const [customers, setCustomers] = useState<KimaiCustomer[]>([]);
+  const [activityNameCache, setActivityNameCache] = useState<Record<number, string>>({});
   const [selectedProject, setSelectedProject] = useState<KimaiProject | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<KimaiActivity | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<KimaiCustomer | null>(null);
@@ -154,6 +155,24 @@ export function TrayView() {
       // Load active timers and selector state
       const timers = await window.electronAPI.getActiveTimers();
       setActiveTimers(timers);
+
+      // Build activity name cache for running timer cards
+      if (timers.length > 0) {
+        const uniqueProjectIds = [...new Set(timers.map(t => t.projectId))];
+        const nameCache: Record<number, string> = {};
+        for (const pid of uniqueProjectIds) {
+          try {
+            const acts = await window.electronAPI.kimaiGetActivities(pid);
+            for (const act of acts) {
+              nameCache[act.id] = act.name;
+            }
+          } catch {
+            // Ignore — will fall back to ID display
+          }
+        }
+        setActivityNameCache(nameCache);
+      }
+
       const selections = await window.electronAPI.getTimerSelections();
 
       // Load description and Jira issue from selector state
@@ -1134,7 +1153,7 @@ export function TrayView() {
       {/* Running Timer Cards */}
       {activeTimers.length > 0 && (
         <div className="border-b border-border">
-          {activeTimers.map((timer) => (
+          {[...activeTimers].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()).map((timer) => (
             <div key={timer.timesheetId} className="p-3 border-b border-border/50 last:border-b-0 bg-gradient-to-r from-green-500/5 to-transparent">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex-1 min-w-0">
@@ -1148,7 +1167,7 @@ export function TrayView() {
                     <span className="text-xs text-muted-foreground truncate">
                       {customers.find(c => c.id === timer.customerId)?.name}
                       {timer.customerId && ' / '}
-                      {`Activity #${timer.activityId}`}
+                      {activityNameCache[timer.activityId] || `Activity #${timer.activityId}`}
                     </span>
                   </div>
                   {timer.description && (
