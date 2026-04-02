@@ -1,25 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, Clock, Magnet, Info, Play } from 'lucide-react';
-import { TimerState } from '../types';
+import { ActiveTimer } from '../types';
 
 export function TimeRoundingView() {
-  const [timerState, setTimerState] = useState<TimerState | null>(null);
+  const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
   const [currentTime, setCurrentTime] = useState(new Date());
 
   useEffect(() => {
-    // Load timer state
-    const loadTimerState = async () => {
+    const loadTimers = async () => {
       if (!window.electronAPI) return;
-      const state = await window.electronAPI.getTimerState();
-      setTimerState(state);
+      const timers = await window.electronAPI.getActiveTimers();
+      setActiveTimers(timers);
     };
 
-    loadTimerState();
+    loadTimers();
 
     // Update current time every second for live preview
     const interval = setInterval(() => {
       setCurrentTime(new Date());
-      loadTimerState();
+      loadTimers();
     }, 1000);
 
     return () => clearInterval(interval);
@@ -58,13 +57,14 @@ export function TimeRoundingView() {
   const roundedEndTime = roundUp15(now);
   const minutesUntilSnap = Math.round((roundedEndTime.getTime() - now.getTime()) / 60000);
 
-  // Calculate billed duration if timer is running
+  // Calculate billed duration if a timer is running (use first timer for preview)
   let billedDuration = 0;
   let actualDuration = 0;
-  if (timerState?.isRunning && timerState.startTime) {
-    const startTime = new Date(timerState.startTime);
+  const firstTimer = activeTimers[0];
+  if (firstTimer) {
+    const startTime = new Date(firstTimer.startTime);
     billedDuration = Math.floor((roundedEndTime.getTime() - startTime.getTime()) / 1000);
-    actualDuration = Math.floor((now.getTime() - (timerState.actualStartTime ? new Date(timerState.actualStartTime).getTime() : startTime.getTime())) / 1000);
+    actualDuration = Math.floor((now.getTime() - (firstTimer.actualStartTime ? new Date(firstTimer.actualStartTime).getTime() : startTime.getTime())) / 1000);
   }
 
   return (
@@ -87,7 +87,7 @@ export function TimeRoundingView() {
       </div>
 
       {/* Live Timer Preview */}
-      {timerState?.isRunning && (
+      {activeTimers.length > 0 && (
         <div className="bg-green-500/10 border border-green-500/30 rounded-lg p-4 space-y-3">
           <div className="flex items-center gap-2">
             <Play className="h-4 w-4 text-green-600 fill-green-600" />

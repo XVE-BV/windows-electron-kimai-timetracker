@@ -7,19 +7,21 @@ import {
   Clock
 } from 'lucide-react';
 import { Button } from './ui/button';
-import { TimerState, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem, ThemeMode } from '../types';
+import { ActiveTimer, TimerSelections, KimaiProject, KimaiActivity, KimaiTimesheet, KimaiCustomer, JiraIssue, ActivitySummaryItem, ThemeMode } from '../types';
 import { formatDurationHuman } from '../utils';
 import { DATA_REFRESH_INTERVAL_MS, TIMER_UPDATE_INTERVAL_MS, MAX_RECENT_TIMESHEETS, MAX_ACTIVITY_SUMMARY_ITEMS, MAX_JIRA_ISSUES } from '../constants';
 
 export function TrayView() {
-  const [timerState, setTimerState] = useState<TimerState | null>(null);
-  const timerStateRef = useRef<TimerState | null>(null);
-  const [elapsedTime, setElapsedTime] = useState('00:00:00');
-  const [billedTime, setBilledTime] = useState('00:00:00');
+  const [activeTimers, setActiveTimers] = useState<ActiveTimer[]>([]);
+  const activeTimersRef = useRef<ActiveTimer[]>([]);
+  const [elapsedTimes, setElapsedTimes] = useState<Record<number, string>>({});
+  const [billedTimes, setBilledTimes] = useState<Record<number, string>>({});
+  const [stoppingTimerId, setStoppingTimerId] = useState<number | null>(null);
   const [projects, setProjects] = useState<KimaiProject[]>([]);
   const [allProjects, setAllProjects] = useState<KimaiProject[]>([]);
   const [activities, setActivities] = useState<KimaiActivity[]>([]);
   const [customers, setCustomers] = useState<KimaiCustomer[]>([]);
+  const [activityNameCache, setActivityNameCache] = useState<Record<number, string>>({});
   const [selectedProject, setSelectedProject] = useState<KimaiProject | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<KimaiActivity | null>(null);
   const [selectedCustomer, setSelectedCustomer] = useState<KimaiCustomer | null>(null);
@@ -35,8 +37,6 @@ export function TrayView() {
   const [searchQuery, setSearchQuery] = useState('');
   const [description, setDescription] = useState('');
   const [savedDescription, setSavedDescription] = useState('');
-  const [isUpdatingDescription, setIsUpdatingDescription] = useState(false);
-
   // Jira state
   const [jiraEnabled, setJiraEnabled] = useState(false);
   const [jiraAutoLogWorklog, setJiraAutoLogWorklog] = useState(false);
@@ -152,17 +152,36 @@ export function TrayView() {
       const reminders = await window.electronAPI.getRemindersEnabled();
       setRemindersEnabled(reminders);
 
-      // Load timer state
-      const state = await window.electronAPI.getTimerState();
-      setTimerState(state);
+      // Load active timers and selector state
+      const timers = await window.electronAPI.getActiveTimers();
+      setActiveTimers(timers);
 
-      // Load description and Jira issue from timer state
-      if (state.description) {
-        setDescription(state.description);
-        setSavedDescription(state.description);
+      // Build activity name cache for running timer cards
+      if (timers.length > 0) {
+        const uniqueProjectIds = [...new Set(timers.map(t => t.projectId))];
+        const nameCache: Record<number, string> = {};
+        for (const pid of uniqueProjectIds) {
+          try {
+            const acts = await window.electronAPI.kimaiGetActivities(pid);
+            for (const act of acts) {
+              nameCache[act.id] = act.name;
+            }
+          } catch {
+            // Ignore — will fall back to ID display
+          }
+        }
+        setActivityNameCache(nameCache);
       }
-      if (state.jiraIssue) {
-        setSelectedJiraIssue(state.jiraIssue);
+
+      const selections = await window.electronAPI.getTimerSelections();
+
+      // Load description and Jira issue from selector state
+      if (selections.description) {
+        setDescription(selections.description);
+        setSavedDescription(selections.description);
+      }
+      if (selections.jiraIssue) {
+        setSelectedJiraIssue(selections.jiraIssue);
       }
 
       // Load customers
@@ -178,43 +197,31 @@ export function TrayView() {
       setAllProjects(projs);
       setConnectionStatus('connected');
 
-      if (state.isRunning && state.projectId) {
-        // Timer is running - load from timer state
-        const proj = projs.find(p => p.id === state.projectId);
-        setSelectedProject(proj || null);
-
-        if (proj) {
-          const cust = custs.find(c => c.id === proj.customer);
-          setSelectedCustomer(cust || null);
-          // Filter projects by customer
-          setProjects(projs.filter(p => p.customer === proj.customer));
-        }
-
-        const acts = await window.electronAPI.kimaiGetActivities(state.projectId);
-        setActivities(acts);
-
-        if (state.activityId) {
-          const act = acts.find(a => a.id === state.activityId);
-          setSelectedActivity(act || null);
-        }
-      } else if (state.jiraIssue) {
-        // Timer not running but Jira issue selected - restore saved selections (customerId may be null if no match was found)
-        const cust = state.customerId ? custs.find(c => c.id === state.customerId) : undefined;
+      if (timers.length > 0 && !selections.projectId) {
+        // Timers running but no selection — leave selectors empty (ready for next timer)
+        setSelectedCustomer(null);
+        setSelectedProject(null);
+        setSelectedActivity(null);
+        setProjects([]);
+        setActivities([]);
+      } else if (selections.jiraIssue) {
+        // Jira issue selected - restore saved selections (customerId may be null if no match was found)
+        const cust = selections.customerId ? custs.find(c => c.id === selections.customerId) : undefined;
         if (cust) {
           setSelectedCustomer(cust);
           setProjects(projs.filter(p => p.customer === cust.id));
         }
 
-        if (state.projectId) {
-          const proj = projs.find(p => p.id === state.projectId);
+        if (selections.projectId) {
+          const proj = projs.find(p => p.id === selections.projectId);
           setSelectedProject(proj || null);
 
           if (proj) {
-            const acts = await window.electronAPI.kimaiGetActivities(state.projectId);
+            const acts = await window.electronAPI.kimaiGetActivities(selections.projectId);
             setActivities(acts);
 
-            if (state.activityId) {
-              const act = acts.find(a => a.id === state.activityId);
+            if (selections.activityId) {
+              const act = acts.find(a => a.id === selections.activityId);
               setSelectedActivity(act || null);
             }
           }
@@ -344,9 +351,9 @@ export function TrayView() {
 
   // Keep ref in sync with state for interval access
   useEffect(() => {
-    timerStateRef.current = timerState;
+    activeTimersRef.current = activeTimers;
     updateElapsedTime();
-  }, [timerState]);
+  }, [activeTimers]);
 
   const formatSeconds = (totalSeconds: number): string => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -356,105 +363,97 @@ export function TrayView() {
   };
 
   const updateElapsedTime = () => {
-    const currentState = timerStateRef.current;
+    const timers = activeTimersRef.current;
+    const newElapsed: Record<number, string> = {};
+    const newBilled: Record<number, string> = {};
 
-    if (!currentState?.isRunning || !currentState.startTime) {
-      setElapsedTime('00:00:00');
-      setBilledTime('00:00:00');
-      return;
+    for (const timer of timers) {
+      const now = new Date();
+      const billedStart = new Date(timer.startTime);
+      const billedSeconds = Math.floor((now.getTime() - billedStart.getTime()) / 1000);
+      newBilled[timer.timesheetId] = formatSeconds(billedSeconds);
+
+      const actualSeconds = timer.actualStartTime
+        ? Math.floor((now.getTime() - new Date(timer.actualStartTime).getTime()) / 1000)
+        : billedSeconds;
+      newElapsed[timer.timesheetId] = formatSeconds(actualSeconds);
     }
 
-    const now = new Date();
-
-    // Billed time (from Kimai's rounded start time)
-    const billedStart = new Date(currentState.startTime);
-    const billedSeconds = Math.floor((now.getTime() - billedStart.getTime()) / 1000);
-    setBilledTime(formatSeconds(billedSeconds));
-
-    // Actual time (from when user clicked Start, or fallback to billed)
-    const actualSeconds = currentState.actualStartTime
-      ? Math.floor((now.getTime() - new Date(currentState.actualStartTime).getTime()) / 1000)
-      : billedSeconds;
-    setElapsedTime(formatSeconds(actualSeconds));
+    setElapsedTimes(newElapsed);
+    setBilledTimes(newBilled);
   };
 
-  const handleStartStop = async () => {
+  const handleStart = async () => {
     if (!window.electronAPI || isTimerLoading) return;
+    if (!selectedProject || !selectedActivity) return;
 
     setIsTimerLoading(true);
     try {
-      if (timerState?.isRunning) {
-        // Store Jira issue before clearing state
-        const jiraIssueToLog = selectedJiraIssue;
-        const timerStartTime = timerState.startTime;
+      await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
 
-        await window.electronAPI.kimaiStopTimer();
-
-        // Log to Jira if a ticket was linked and auto-log is enabled
-        let jiraSuccess = true;
-        if (jiraIssueToLog && timerStartTime && jiraEnabled && jiraAutoLogWorklog) {
-          try {
-            const startDate = new Date(timerStartTime);
-            const endDate = new Date();
-            let durationSeconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000);
-
-            // Enforce minimum 15 minutes (same as Kimai)
-            if (durationSeconds < 900) {
-              durationSeconds = 900;
-            }
-
-            await window.electronAPI.jiraAddWorklog(
-              jiraIssueToLog.key,
-              durationSeconds,
-              startDate.toISOString(),
-              description || undefined
-            );
-          } catch (error) {
-            console.error('Failed to log to Jira:', error);
-            showError(`Failed to log time to Jira ${jiraIssueToLog.key}. Time was logged to Kimai only.`);
-            jiraSuccess = false;
+      // Transition Jira issue to "In Progress" if applicable
+      if (selectedJiraIssue && selectedJiraIssue.fields.status.name.toLowerCase() === 'to do') {
+        try {
+          const result = await window.electronAPI.jiraTransitionToInProgress(selectedJiraIssue.key);
+          if (!result.success) {
+            console.warn('Failed to transition Jira issue:', result.message);
           }
-        }
-
-        // Only clear description/Jira issue if Jira logged successfully (or wasn't needed)
-        if (jiraSuccess) {
-          setDescription('');
-          setSavedDescription('');
-          setSelectedJiraIssue(null);
-          window.electronAPI.setTimerJiraIssue(null);
-        }
-      } else if (selectedProject && selectedActivity) {
-        await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
-        setSavedDescription(description);
-
-        // Transition Jira issue to "In Progress" if it's currently "To Do"
-        if (selectedJiraIssue && selectedJiraIssue.fields.status.name.toLowerCase() === 'to do') {
-          try {
-            const result = await window.electronAPI.jiraTransitionToInProgress(selectedJiraIssue.key);
-            if (result.success) {
-              // Update the local issue status and persist to timer state
-              const updatedIssue = {
-                ...selectedJiraIssue,
-                fields: {
-                  ...selectedJiraIssue.fields,
-                  status: { ...selectedJiraIssue.fields.status, name: 'In Progress' },
-                },
-              };
-              setSelectedJiraIssue(updatedIssue);
-              window.electronAPI.setTimerJiraIssue(updatedIssue);
-            } else {
-              console.warn('Failed to transition Jira issue:', result.message);
-            }
-          } catch (error) {
-            console.error('Failed to transition Jira issue:', error);
-          }
+        } catch (error) {
+          console.error('Failed to transition Jira issue:', error);
         }
       }
+
+      // Reset local selector state
+      setDescription('');
+      setSavedDescription('');
+      setSelectedJiraIssue(null);
+      setSelectedCustomer(null);
+      setSelectedProject(null);
+      setSelectedActivity(null);
+      setProjects([]);
+      setActivities([]);
+
       await loadData();
     } catch (error) {
-      console.error('Timer operation failed:', error);
+      console.error('Start timer failed:', error);
     } finally {
       setIsTimerLoading(false);
+    }
+  };
+
+  const handleStopTimer = async (timer: ActiveTimer) => {
+    if (!window.electronAPI || stoppingTimerId !== null) return;
+
+    setStoppingTimerId(timer.timesheetId);
+    try {
+      // Log to Jira if applicable
+      if (timer.jiraIssue && timer.startTime && jiraEnabled && jiraAutoLogWorklog) {
+        try {
+          const startDate = new Date(timer.startTime);
+          const endDate = new Date();
+          let durationSeconds = Math.floor((endDate.getTime() - startDate.getTime()) / 1000);
+          if (durationSeconds < 900) {
+            durationSeconds = 900;
+          }
+          await window.electronAPI.jiraAddWorklog(
+            timer.jiraIssue.key,
+            durationSeconds,
+            startDate.toISOString(),
+            timer.description || undefined
+          );
+        } catch (error) {
+          console.error('Failed to log to Jira:', error);
+          showError(`Failed to log time to Jira ${timer.jiraIssue.key}. Time was logged to Kimai only.`);
+        }
+      }
+
+      await window.electronAPI.kimaiStopTimer(timer.timesheetId);
+      await loadData();
+    } catch (error) {
+      console.error('Stop timer failed:', error);
+      showError('Failed to stop timer');
+    } finally {
+      setStoppingTimerId(null);
     }
   };
 
@@ -476,20 +475,6 @@ export function TrayView() {
       setRemindersEnabled(enabled);
     } catch (error) {
       console.error('Failed to toggle reminders:', error);
-    }
-  };
-
-  const handleUpdateDescription = async () => {
-    if (!window.electronAPI || !timerState?.currentTimesheetId) return;
-    setIsUpdatingDescription(true);
-    try {
-      await window.electronAPI.kimaiUpdateDescription(timerState.currentTimesheetId, description);
-      setSavedDescription(description);
-    } catch (error) {
-      console.error('Failed to update description:', error);
-      showError('Failed to update description');
-    } finally {
-      setIsUpdatingDescription(false);
     }
   };
 
@@ -1115,7 +1100,7 @@ export function TrayView() {
               <Settings className="h-3.5 w-3.5" />
               Settings
             </button>
-            {remindersEnabled && !timerState?.isRunning && (
+            {remindersEnabled && activeTimers.length === 0 && (
               <span className="text-[10px] px-1.5 py-0.5 bg-yellow-500/20 text-yellow-600 rounded animate-pulse">
                 Not tracking!
               </span>
@@ -1165,50 +1150,82 @@ export function TrayView() {
         </div>
       </div>
 
-      {/* Timer Display */}
-      <div className="p-4 text-center border-b border-border bg-gradient-to-b from-background to-muted/20">
-        <div className={`text-4xl font-mono font-bold tracking-wider ${timerState?.isRunning ? 'text-primary' : 'text-muted-foreground'}`}>
-          {elapsedTime}
+      {/* Running Timer Cards */}
+      {activeTimers.length > 0 && (
+        <div className="border-b border-border">
+          {[...activeTimers].sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()).map((timer) => (
+            <div key={timer.timesheetId} className="p-3 border-b border-border/50 last:border-b-0 bg-gradient-to-r from-green-500/5 to-transparent">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-green-500 animate-pulse flex-shrink-0" />
+                    <span className="text-sm font-medium truncate">
+                      {allProjects.find(p => p.id === timer.projectId)?.name || 'Unknown Project'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5 ml-4">
+                    <span className="text-xs text-muted-foreground truncate">
+                      {customers.find(c => c.id === timer.customerId)?.name}
+                      {timer.customerId && ' / '}
+                      {activityNameCache[timer.activityId] || `Activity #${timer.activityId}`}
+                    </span>
+                  </div>
+                  {timer.description && (
+                    <div className="text-xs text-muted-foreground mt-1 ml-4 truncate">
+                      {timer.description}
+                    </div>
+                  )}
+                  {timer.jiraIssue && (
+                    <div className="mt-1 ml-4">
+                      <span className="text-[10px] font-mono px-1.5 py-0.5 bg-blue-500/10 text-blue-600 rounded">
+                        {timer.jiraIssue.key}
+                      </span>
+                    </div>
+                  )}
+                </div>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <div className="text-right">
+                    <div className="text-lg font-mono font-bold text-primary">
+                      {elapsedTimes[timer.timesheetId] || '00:00:00'}
+                    </div>
+                    {elapsedTimes[timer.timesheetId] !== billedTimes[timer.timesheetId] && (
+                      <div className="text-[10px] font-mono text-muted-foreground" title="Billed time (Kimai rounds to 15min)">
+                        Billed: {billedTimes[timer.timesheetId] || '00:00:00'}
+                      </div>
+                    )}
+                  </div>
+                  <Button
+                    onClick={() => handleStopTimer(timer)}
+                    disabled={stoppingTimerId !== null}
+                    size="sm"
+                    className="bg-red-500 hover:bg-red-600 h-8 w-8 p-0"
+                    title="Stop timer"
+                  >
+                    {stoppingTimerId === timer.timesheetId ? (
+                      <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+                    ) : (
+                      <Square className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
-        {timerState?.isRunning && elapsedTime !== billedTime && (
-          <div
-            className="text-sm font-mono text-muted-foreground mt-1 cursor-help"
-            title="Kimai rounds start time down to the nearest 15 minutes"
-          >
-            Billed: {billedTime}
-          </div>
-        )}
-        <div className="flex items-center justify-center gap-1 mt-2">
-          <div className={`h-2 w-2 rounded-full ${timerState?.isRunning ? 'bg-green-500 animate-pulse' : 'bg-muted-foreground/30'}`} />
-          <p className="text-xs text-muted-foreground">
-            {timerState?.isRunning ? 'Timer running' : 'Timer stopped'}
-          </p>
-        </div>
+      )}
 
-        {/* Current Selection Info */}
-        {(selectedProject || selectedActivity || selectedCustomer) && (
-          <div className="mt-3 p-2 bg-muted/50 rounded-lg text-left">
-            {selectedCustomer && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Briefcase className="h-3 w-3" />
-                <span className="truncate">{selectedCustomer.name}</span>
-              </div>
-            )}
-            {selectedProject && (
-              <div className="flex items-center gap-2 text-xs mt-1">
-                <Layers className="h-3 w-3 text-primary" />
-                <span className="truncate font-medium">{selectedProject.name}</span>
-              </div>
-            )}
-            {selectedActivity && (
-              <div className="flex items-center gap-2 text-xs text-muted-foreground mt-1">
-                <Activity className="h-3 w-3" />
-                <span className="truncate">{selectedActivity.name}</span>
-              </div>
-            )}
+      {/* Idle State */}
+      {activeTimers.length === 0 && (
+        <div className="p-4 text-center border-b border-border bg-gradient-to-b from-background to-muted/20">
+          <div className="text-4xl font-mono font-bold tracking-wider text-muted-foreground">
+            00:00:00
           </div>
-        )}
-      </div>
+          <div className="flex items-center justify-center gap-1 mt-2">
+            <div className="h-2 w-2 rounded-full bg-muted-foreground/30" />
+            <p className="text-xs text-muted-foreground">No timers running</p>
+          </div>
+        </div>
+      )}
 
       {/* Today's Stats */}
       <div className="grid grid-cols-2 gap-px bg-border">
@@ -1292,8 +1309,7 @@ export function TrayView() {
                   </div>
                   <button
                     onClick={clearJiraIssue}
-                    disabled={timerState?.isRunning}
-                    className="p-1 hover:bg-muted rounded disabled:opacity-50"
+                    className="p-1 hover:bg-muted rounded"
                   >
                     <X className="h-3 w-3 text-muted-foreground" />
                   </button>
@@ -1323,8 +1339,7 @@ export function TrayView() {
                   }
                   setView('jira');
                 }}
-                disabled={timerState?.isRunning}
-                className="w-full px-3 py-2 text-left bg-muted/50 hover:bg-muted rounded-md flex items-center justify-between disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 text-left bg-muted/50 hover:bg-muted rounded-md flex items-center justify-between"
               >
                 <div className="flex items-center gap-2">
                   <Ticket className="h-4 w-4 text-blue-500" />
@@ -1345,45 +1360,21 @@ export function TrayView() {
             rows={2}
             className="w-full px-3 py-2 text-sm bg-background border-2 border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary placeholder:text-muted-foreground/60 resize-none"
           />
-          {/* Update button when description is dirty while timer is running */}
-          {timerState?.isRunning && description !== savedDescription && (
-            <Button
-              onClick={handleUpdateDescription}
-              disabled={isUpdatingDescription}
-              variant="secondary"
-              size="sm"
-              className="mt-1 w-full"
-            >
-              {isUpdatingDescription ? (
-                <>
-                  <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
-                  Updating...
-                </>
-              ) : (
-                'Update Description'
-              )}
-            </Button>
-          )}
         </div>
       </div>
 
-      {/* Start/Stop Button */}
+      {/* Start Button */}
       <div className="px-2 pb-2">
         <Button
-          onClick={handleStartStop}
-          disabled={isTimerLoading || (!timerState?.isRunning && (!selectedProject || !selectedActivity))}
-          className={`w-full ${timerState?.isRunning ? 'bg-red-500 hover:bg-red-600' : 'bg-green-500 hover:bg-green-600'}`}
+          onClick={handleStart}
+          disabled={isTimerLoading || !selectedProject || !selectedActivity}
+          className="w-full bg-green-500 hover:bg-green-600"
           size="lg"
         >
           {isTimerLoading ? (
             <>
               <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-              {timerState?.isRunning ? 'Stopping...' : 'Starting...'}
-            </>
-          ) : timerState?.isRunning ? (
-            <>
-              <Square className="h-4 w-4 mr-2" />
-              Stop Timer
+              Starting...
             </>
           ) : (
             <>
