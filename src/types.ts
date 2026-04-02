@@ -181,6 +181,27 @@ export interface TimerState {
   jiraIssue: JiraIssue | null;     // Selected Jira issue (persisted)
 }
 
+// Active timer - one per running timesheet
+export interface ActiveTimer {
+  timesheetId: number;
+  projectId: number;
+  activityId: number;
+  customerId: number | null;
+  description: string;
+  startTime: string;              // Kimai's rounded start time
+  actualStartTime: string | null; // When user clicked Start (null for server-discovered timers)
+  jiraIssue: JiraIssue | null;
+}
+
+// Selector state for the next timer to start
+export interface TimerSelections {
+  customerId: number | null;
+  projectId: number | null;
+  activityId: number | null;
+  description: string;
+  jiraIssue: JiraIssue | null;
+}
+
 // View Hashes for single-window navigation
 export const VIEW_HASHES = {
   TRAY: 'tray',
@@ -224,9 +245,10 @@ export const IPC_CHANNELS = {
   JIRA_TRANSITION_TO_IN_PROGRESS: 'jira-transition-to-in-progress',
 
   // Timer
-  GET_TIMER_STATE: 'get-timer-state',
-  SET_TIMER_JIRA_ISSUE: 'set-timer-jira-issue',
+  GET_ACTIVE_TIMERS: 'get-active-timers',
+  GET_TIMER_SELECTIONS: 'get-timer-selections',
   SET_TIMER_SELECTIONS: 'set-timer-selections',
+  SET_TIMER_JIRA_ISSUE: 'set-timer-jira-issue',
 
   // Reminders
   GET_REMINDERS_ENABLED: 'get-reminders-enabled',
