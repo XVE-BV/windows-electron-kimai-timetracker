@@ -5,9 +5,50 @@ on:
     tags:
       - 'v*'
   workflow_dispatch:
+    inputs:
+      bump:
+        description: 'Version bump type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+
+permissions:
+  contents: write
 
 jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.resolve.outputs.version }}
+      tag: ${{ steps.resolve.outputs.tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Bump version
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          npm version ${{ inputs.bump }} -m "chore: release v%s"
+          git push --follow-tags
+
+      - name: Resolve version
+        id: resolve
+        run: |
+          if [[ "$GITHUB_EVENT_NAME" == "workflow_dispatch" ]]; then
+            TAG=$(git describe --tags --abbrev=0)
+          else
+            TAG="$GITHUB_REF_NAME"
+          fi
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=${TAG#v}" >> $GITHUB_OUTPUT
+
   build:
+    needs: prepare
     strategy:
       matrix:
         include:
@@ -26,6 +67,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.tag }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -44,16 +87,11 @@ jobs:
       - name: Build and Make
         run: pnpm run make
 
-      - name: Get version
-        id: version
-        shell: bash
-        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
-
       - name: Rename artifacts (Windows)
         if: matrix.os == 'windows-latest'
         shell: pwsh
         run: |
-          $version = "${{ steps.version.outputs.version }}"
+          $version = "${{ needs.prepare.outputs.version }}"
           # Copy installer
           Get-ChildItem -Path out/make -Recurse -Filter "*.exe" | ForEach-Object {
             $newName = "KimaiTimeTracker-$version-Windows-Setup.exe"
@@ -70,14 +108,14 @@ jobs:
       - name: Rename artifacts (macOS)
         if: matrix.os == 'macos-latest'
         run: |
-          version="${{ steps.version.outputs.version }}"
+          version="${{ needs.prepare.outputs.version }}"
           find out/make -name "*.dmg" -exec cp {} "out/make/KimaiTimeTracker-$version-macOS.dmg" \;
           find out/make -name "*.zip" -exec cp {} "out/make/KimaiTimeTracker-$version-macOS.zip" \;
 
       - name: Rename artifacts (Linux)
         if: matrix.os == 'ubuntu-latest'
         run: |
-          version="${{ steps.version.outputs.version }}"
+          version="${{ needs.prepare.outputs.version }}"
           find out/make -name "*.deb" -exec cp {} "out/make/KimaiTimeTracker-$version-Linux-amd64.deb" \;
           find out/make -name "*.rpm" -exec cp {} "out/make/KimaiTimeTracker-$version-Linux-x86_64.rpm" \;
 
@@ -92,12 +130,8 @@ jobs:
           if-no-files-found: ignore
 
   release:
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
-    if: startsWith(github.ref, 'refs/tags/v')
-
-    permissions:
-      contents: write
 
     steps:
       - name: Download all artifacts
@@ -109,10 +143,9 @@ jobs:
         run: find artifacts -type f
 
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ needs.prepare.outputs.tag }}
           files: artifacts/**/*
           generate_release_notes: true
           draft: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
