@@ -370,6 +370,18 @@ function showNotification(title: string, body: string): void {
   console.log('[notification] Showing:', title, body);
   if (Notification.isSupported()) {
     const notification = new Notification({ title, body });
+    notification.on('click', () => {
+      if (!trayWindow || trayWindow.isDestroyed()) {
+        createTrayWindow();
+      }
+      if (trayWindow) {
+        if (!trayWindow.isVisible()) {
+          trayWindow.center();
+          trayWindow.show();
+        }
+        trayWindow.focus();
+      }
+    });
     notification.show();
     notification.on('show', () => console.log('[notification] Shown successfully'));
     notification.on('failed', (e) => console.error('[notification] Failed:', e));
