@@ -14,6 +14,7 @@ import {
   JiraIssue,
   ActivitySummaryItem,
   ThemeMode,
+  TrayIconState,
 } from './types';
 
 // Expose protected methods that allow the renderer process to use
@@ -114,6 +115,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('update-status-changed', listener);
   },
 
+  // Tray Icons
+  setTrayIcons: (icons: Record<TrayIconState, string>) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SET_TRAY_ICONS, icons),
+  getPlatform: () => process.platform as 'darwin' | 'win32' | 'linux',
+
   // Events
   onSettingsChanged: (callback: () => void) => {
     ipcRenderer.on('settings-changed', callback);
@@ -190,6 +196,8 @@ export interface ElectronAPI {
   checkForUpdates: () => Promise<{ status: string; version?: string; error?: string }>;
   quitAndInstall: () => Promise<void>;
   onUpdateStatusChanged: (callback: (status: { status: string; version?: string; error?: string }) => void) => () => void;
+  setTrayIcons: (icons: Record<TrayIconState, string>) => Promise<void>;
+  getPlatform: () => 'darwin' | 'win32' | 'linux';
   onSettingsChanged: (callback: () => void) => () => void;
 }
 

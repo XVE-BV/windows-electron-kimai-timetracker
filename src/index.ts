@@ -20,7 +20,7 @@ import {
   clearDecryptionFailedFlag,
   isUsingPlaintextFallback,
 } from './services/store';
-import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ActiveTimer, TimerSelections, ThemeMode, JiraIssue } from './types';
+import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ActiveTimer, TimerSelections, ThemeMode, JiraIssue, TrayIconState } from './types';
 import {
   validateAppSettings,
   validateOptionalPositiveInt,
@@ -81,6 +81,9 @@ let remindersEnabled = true;
 
 // Reminder interval
 let reminderInterval: NodeJS.Timeout | null = null;
+
+// Tray icon cache (populated by renderer via IPC)
+const trayIconCache: Partial<Record<TrayIconState, Electron.NativeImage>> = {};
 
 function createTrayIcon(): Electron.NativeImage {
   // Use platform-appropriate icon format
@@ -258,6 +261,57 @@ async function updateTrayMenu(): Promise<void> {
     } else {
       tray.setToolTip('Kimai Time Tracker - Idle');
     }
+
+    updateTrayIcon();
+  }
+}
+
+function getTrayIconState(): TrayIconState {
+  const isTracking = getActiveTimers().length > 0;
+  const isMuted = !remindersEnabled;
+  if (isTracking && isMuted) return 'tracking-muted';
+  if (isTracking) return 'tracking';
+  if (isMuted) return 'idle-muted';
+  return 'idle';
+}
+
+function updateTrayIcon(): void {
+  if (!tray) return;
+
+  const state = getTrayIconState();
+  const icon = trayIconCache[state];
+  if (icon) {
+    tray.setImage(icon);
+  }
+
+  const isMac = process.platform === 'darwin';
+  const activeTimers = getActiveTimers();
+
+  // macOS: show elapsed time next to tray icon
+  if (isMac) {
+    if (activeTimers.length > 0) {
+      const elapsed = formatDurationCompact(getElapsedSeconds(activeTimers[0]));
+      tray.setTitle(elapsed, { fontType: 'monospacedDigit' });
+    } else {
+      tray.setTitle('');
+    }
+  }
+
+  // macOS: dock badge with active timer count
+  if (isMac && app.dock) {
+    app.dock.setBadge(activeTimers.length > 0 ? activeTimers.length.toString() : '');
+  }
+
+  // Windows: overlay icon on taskbar
+  if (process.platform === 'win32' && trayWindow && !trayWindow.isDestroyed()) {
+    if (activeTimers.length > 0) {
+      const overlay = trayIconCache['tracking'];
+      if (overlay) {
+        trayWindow.setOverlayIcon(overlay.resize({ width: 16, height: 16 }), 'Timer running');
+      }
+    } else {
+      trayWindow.setOverlayIcon(null, '');
+    }
   }
 }
 
@@ -379,6 +433,7 @@ function getRemindersEnabled(): boolean {
 
 function toggleReminders(): boolean {
   remindersEnabled = !remindersEnabled;
+  updateTrayIcon();
   return remindersEnabled;
 }
 
@@ -859,6 +914,28 @@ function setupIPC(): void {
     return didDecryptionFail();
   });
 
+  // Tray Icons
+  ipcMain.handle(IPC_CHANNELS.SET_TRAY_ICONS, (_, icons: Record<TrayIconState, string>) => {
+    const isMac = process.platform === 'darwin';
+    for (const [state, dataUrl] of Object.entries(icons)) {
+      let img = nativeImage.createFromDataURL(dataUrl);
+      if (isMac) {
+        // Don't resize — it corrupts the alpha channel (electron/electron#12308).
+        // Instead, re-create from buffer with scaleFactor:2.0 so macOS treats
+        // the 32px image as a 16pt icon with @2x density.
+        const pngBuffer = img.toPNG();
+        img = nativeImage.createFromBuffer(pngBuffer, {
+          width: 32,
+          height: 32,
+          scaleFactor: 2.0,
+        });
+        img.setTemplateImage(true);
+      }
+      trayIconCache[state as TrayIconState] = img;
+    }
+    updateTrayIcon();
+  });
+
   // Notifications
   ipcMain.handle(IPC_CHANNELS.SHOW_NOTIFICATION, (_, title: string, body: string) => {
     showNotification(title, body);
@@ -933,6 +1010,13 @@ async function initializeApp(): Promise<void> {
   // On macOS, safeStorage requires a BrowserWindow to exist first
   // See: https://github.com/electron/electron/issues/34614
   createTrayWindow();
+
+  // macOS: trigger notification permission prompt early.
+  // Required for app.dock.setBadge() to work (electron/electron#22715).
+  if (process.platform === 'darwin' && Notification.isSupported()) {
+    const n = new Notification({ title: 'Kimai Time Tracker', body: 'Timer ready', silent: true });
+    n.show();
+  }
 
   // Apply saved theme setting (now safe to call getSettings which uses safeStorage)
   const settings = getSettings();
