@@ -501,6 +501,11 @@ export function TrayView() {
     setProjects(filteredProjects);
     setSearchQuery('');
     setView('projects');
+    window.electronAPI?.setTimerSelections({
+      customerId: customer.id,
+      projectId: null,
+      activityId: null,
+    });
   };
 
   const handleToggleFavoriteCustomer = async (customerId: number, e: React.MouseEvent) => {
@@ -537,12 +542,25 @@ export function TrayView() {
     }
     setSearchQuery('');
     setView('activities');
+    window.electronAPI?.setTimerSelections({
+      customerId: project.customer,
+      projectId: project.id,
+      activityId: null,
+    });
   };
 
   const handleSelectActivity = (activity: KimaiActivity) => {
     setSelectedActivity(activity);
     setSearchQuery('');
     setView('main');
+    const activityProject = activity.project != null
+      ? allProjects.find(p => p.id === activity.project) ?? null
+      : null;
+    window.electronAPI?.setTimerSelections({
+      customerId: activityProject?.customer ?? null,
+      projectId: activity.project ?? null,
+      activityId: activity.id,
+    });
   };
 
   const handleSelectJiraIssue = async (issue: JiraIssue) => {
