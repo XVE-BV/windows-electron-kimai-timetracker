@@ -197,9 +197,9 @@ export function TrayView() {
           const act = acts.find(a => a.id === state.activityId);
           setSelectedActivity(act || null);
         }
-      } else if (state.jiraIssue && state.customerId) {
-        // Timer not running but Jira issue selected - restore saved selections
-        const cust = custs.find(c => c.id === state.customerId);
+      } else if (state.jiraIssue) {
+        // Timer not running but Jira issue selected - restore saved selections (customerId may be null if no match was found)
+        const cust = state.customerId ? custs.find(c => c.id === state.customerId) : undefined;
         if (cust) {
           setSelectedCustomer(cust);
           setProjects(projs.filter(p => p.customer === cust.id));
@@ -561,6 +561,7 @@ export function TrayView() {
       // Try to match customfield_10278 (customer field) first
       const jiraCustomerName = (issue.fields.customfield_10278 as { value?: string } | undefined)?.value;
       const jiraProjectName = issue.fields.project?.name;
+      const jiraProjectKey = issue.fields.project?.key;
 
       let matchedCustomer: KimaiCustomer | undefined;
 
@@ -590,6 +591,11 @@ export function TrayView() {
       // Fallback to project name
       if (!matchedCustomer && jiraProjectName) {
         matchedCustomer = findBestMatch(jiraProjectName);
+      }
+
+      // Fallback to project key (e.g. "M18" key matches "M18 Executive Search" customer)
+      if (!matchedCustomer && jiraProjectKey) {
+        matchedCustomer = findBestMatch(jiraProjectKey);
       }
 
       // Set the matched customer and load projects
