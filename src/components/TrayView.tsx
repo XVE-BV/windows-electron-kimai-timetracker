@@ -565,8 +565,10 @@ export function TrayView() {
 
       let matchedCustomer: KimaiCustomer | undefined;
 
-      // Helper to find best matching customer (prefers longer names for more specific matches)
-      const findBestMatch = (searchTerm: string): KimaiCustomer | undefined => {
+      // Helper to find best matching customer (prefers longer names for more specific matches).
+      // When oneDirectional is true, only checks if the customer name contains the search term —
+      // the reverse arm is skipped to prevent short project keys from matching longer customer names.
+      const findBestMatch = (searchTerm: string, oneDirectional = false): KimaiCustomer | undefined => {
         const term = searchTerm.toLowerCase();
         // First try exact match
         const exact = customers.find(c => c.name.toLowerCase() === term);
@@ -574,7 +576,7 @@ export function TrayView() {
 
         // Find all partial matches and pick the longest (most specific)
         const partialMatches = customers.filter(c =>
-          c.name.toLowerCase().includes(term) || term.includes(c.name.toLowerCase())
+          c.name.toLowerCase().includes(term) || (!oneDirectional && term.includes(c.name.toLowerCase()))
         );
         if (partialMatches.length > 0) {
           // Sort by name length descending, pick longest
@@ -593,9 +595,11 @@ export function TrayView() {
         matchedCustomer = findBestMatch(jiraProjectName);
       }
 
-      // Fallback to project key (e.g. "M18" key matches "M18 Executive Search" customer)
+      // Fallback to project key (e.g. "M18" key matches "M18 Executive Search" customer).
+      // Use one-directional matching so a short key like "M18" does not falsely match a
+      // customer named "M1" via the reverse arm term.includes(c.name).
       if (!matchedCustomer && jiraProjectKey) {
-        matchedCustomer = findBestMatch(jiraProjectKey);
+        matchedCustomer = findBestMatch(jiraProjectKey, true);
       }
 
       // Set the matched customer and load projects
