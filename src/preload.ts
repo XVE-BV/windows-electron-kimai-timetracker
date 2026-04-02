@@ -7,7 +7,8 @@ import {
   KimaiProject,
   KimaiActivity,
   KimaiTimesheet,
-  TimerState,
+  ActiveTimer,
+  TimerSelections,
   AWBuckets,
   AWEvent,
   JiraIssue,
@@ -31,7 +32,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.invoke(IPC_CHANNELS.KIMAI_GET_TIMESHEETS, params),
   kimaiStartTimer: (projectId: number, activityId: number, description?: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.KIMAI_START_TIMER, projectId, activityId, description),
-  kimaiStopTimer: () => ipcRenderer.invoke(IPC_CHANNELS.KIMAI_STOP_TIMER),
+  kimaiStopTimer: (timesheetId: number) =>
+    ipcRenderer.invoke(IPC_CHANNELS.KIMAI_STOP_TIMER, timesheetId),
   kimaiCreateTimesheet: (data: KimaiTimesheetCreate) =>
     ipcRenderer.invoke(IPC_CHANNELS.KIMAI_CREATE_TIMESHEET, data),
   kimaiDeleteTimesheet: (id: number) =>
@@ -55,11 +57,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
   jiraTransitionToInProgress: (issueKey: string) =>
     ipcRenderer.invoke(IPC_CHANNELS.JIRA_TRANSITION_TO_IN_PROGRESS, issueKey),
 
-  // Timer State
-  getTimerState: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TIMER_STATE),
-  setTimerJiraIssue: (jiraIssue: JiraIssue | null) => ipcRenderer.invoke(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, jiraIssue),
-  setTimerSelections: (selections: { customerId?: number | null; projectId?: number | null; activityId?: number | null }) =>
+  // Active Timers & Selections
+  getActiveTimers: () => ipcRenderer.invoke(IPC_CHANNELS.GET_ACTIVE_TIMERS),
+  getTimerSelections: () => ipcRenderer.invoke(IPC_CHANNELS.GET_TIMER_SELECTIONS),
+  setTimerSelections: (selections: Partial<TimerSelections>) =>
     ipcRenderer.invoke(IPC_CHANNELS.SET_TIMER_SELECTIONS, selections),
+  setTimerJiraIssue: (jiraIssue: JiraIssue | null) =>
+    ipcRenderer.invoke(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, jiraIssue),
 
   // Reminders
   getRemindersEnabled: () => ipcRenderer.invoke(IPC_CHANNELS.GET_REMINDERS_ENABLED),
@@ -126,8 +130,8 @@ export interface ElectronAPI {
   kimaiGetProjects: (customerId?: number) => Promise<KimaiProject[]>;
   kimaiGetActivities: (projectId?: number) => Promise<KimaiActivity[]>;
   kimaiGetTimesheets: (params?: { user?: string; begin?: string; end?: string; active?: boolean }) => Promise<KimaiTimesheet[]>;
-  kimaiStartTimer: (projectId: number, activityId: number, description?: string) => Promise<TimerState>;
-  kimaiStopTimer: () => Promise<TimerState>;
+  kimaiStartTimer: (projectId: number, activityId: number, description?: string) => Promise<{ activeTimers: ActiveTimer[]; selections: TimerSelections }>;
+  kimaiStopTimer: (timesheetId: number) => Promise<{ activeTimers: ActiveTimer[]; selections: TimerSelections }>;
   kimaiCreateTimesheet: (data: KimaiTimesheetCreate) => Promise<KimaiTimesheet>;
   kimaiDeleteTimesheet: (id: number) => Promise<void>;
   kimaiUpdateDescription: (id: number, description: string) => Promise<KimaiTimesheet>;
@@ -139,9 +143,10 @@ export interface ElectronAPI {
   jiraSearchIssues: (jql: string, maxResults?: number) => Promise<JiraIssue[]>;
   jiraAddWorklog: (issueKey: string, timeSpentSeconds: number, started: string, comment?: string) => Promise<{ id: string }>;
   jiraTransitionToInProgress: (issueKey: string) => Promise<{ success: boolean; message: string }>;
-  getTimerState: () => Promise<TimerState>;
-  setTimerJiraIssue: (jiraIssue: JiraIssue | null) => Promise<TimerState>;
-  setTimerSelections: (selections: { customerId?: number | null; projectId?: number | null; activityId?: number | null }) => Promise<TimerState>;
+  getActiveTimers: () => Promise<ActiveTimer[]>;
+  getTimerSelections: () => Promise<TimerSelections>;
+  setTimerSelections: (selections: Partial<TimerSelections>) => Promise<TimerSelections>;
+  setTimerJiraIssue: (jiraIssue: JiraIssue | null) => Promise<TimerSelections>;
   getRemindersEnabled: () => Promise<boolean>;
   toggleReminders: () => Promise<boolean>;
   getThemeMode: () => Promise<ThemeMode>;
