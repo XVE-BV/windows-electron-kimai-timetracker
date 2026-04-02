@@ -1,6 +1,6 @@
 import Store from 'electron-store';
 import { safeStorage } from 'electron';
-import { AppSettings, TimerState, ActiveTimer, TimerSelections, DEFAULT_SETTINGS } from '../types';
+import { AppSettings, ActiveTimer, TimerSelections, JiraIssue, DEFAULT_SETTINGS } from '../types';
 
 /**
  * Merge stored settings with defaults, ensuring all required fields exist
@@ -39,7 +39,17 @@ function mergeSettings(stored: Partial<AppSettings> | null | undefined): AppSett
 interface StoreSchema {
   settings: AppSettings;
   // Legacy — only used for migration, then deleted
-  timerState?: TimerState;
+  timerState?: {
+    isRunning: boolean;
+    currentTimesheetId: number | null;
+    startTime: string | null;
+    actualStartTime: string | null;
+    customerId: number | null;
+    projectId: number | null;
+    activityId: number | null;
+    description: string;
+    jiraIssue: JiraIssue | null;
+  };
   // New multi-timer state
   activeTimers: ActiveTimer[];
   timerSelections: TimerSelections;
@@ -68,7 +78,7 @@ const store = new Store<StoreSchema>({
 
 function migrateTimerState(): void {
   try {
-    const legacy = store.get('timerState') as TimerState | undefined;
+    const legacy = store.get('timerState');
     if (!legacy) return;
 
     if (legacy.isRunning && legacy.currentTimesheetId && legacy.projectId && legacy.activityId) {

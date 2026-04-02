@@ -168,19 +168,6 @@ export interface AppSettings {
   favoriteCustomerIds: number[];
 }
 
-// Timer State
-export interface TimerState {
-  isRunning: boolean;
-  currentTimesheetId: number | null;
-  startTime: string | null;        // Kimai's rounded start time
-  actualStartTime: string | null;  // When user actually clicked Start
-  customerId: number | null;       // Selected customer (persisted)
-  projectId: number | null;
-  activityId: number | null;
-  description: string;
-  jiraIssue: JiraIssue | null;     // Selected Jira issue (persisted)
-}
-
 // Active timer - one per running timesheet
 export interface ActiveTimer {
   timesheetId: number;
