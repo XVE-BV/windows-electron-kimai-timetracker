@@ -1,6 +1,6 @@
 import Store from 'electron-store';
 import { safeStorage } from 'electron';
-import { AppSettings, TimerState, DEFAULT_SETTINGS } from '../types';
+import { AppSettings, TimerState, ActiveTimer, TimerSelections, DEFAULT_SETTINGS } from '../types';
 
 /**
  * Merge stored settings with defaults, ensuring all required fields exist
@@ -38,7 +38,11 @@ function mergeSettings(stored: Partial<AppSettings> | null | undefined): AppSett
 // Store schema - tokens are stored encrypted
 interface StoreSchema {
   settings: AppSettings;
-  timerState: TimerState;
+  // Legacy — only used for migration, then deleted
+  timerState?: TimerState;
+  // New multi-timer state
+  activeTimers: ActiveTimer[];
+  timerSelections: TimerSelections;
   // Encrypted tokens stored separately
   encryptedTokens?: {
     kimaiToken?: string;
@@ -46,22 +50,58 @@ interface StoreSchema {
   };
 }
 
+const DEFAULT_TIMER_SELECTIONS: TimerSelections = {
+  customerId: null,
+  projectId: null,
+  activityId: null,
+  description: '',
+  jiraIssue: null,
+};
+
 const store = new Store<StoreSchema>({
   defaults: {
     settings: DEFAULT_SETTINGS,
-    timerState: {
-      isRunning: false,
-      currentTimesheetId: null,
-      startTime: null,
-      actualStartTime: null,
-      customerId: null,
-      projectId: null,
-      activityId: null,
-      description: '',
-      jiraIssue: null,
-    },
+    activeTimers: [],
+    timerSelections: DEFAULT_TIMER_SELECTIONS,
   },
 });
+
+function migrateTimerState(): void {
+  try {
+    const legacy = store.get('timerState') as TimerState | undefined;
+    if (!legacy) return;
+
+    if (legacy.isRunning && legacy.currentTimesheetId && legacy.projectId && legacy.activityId) {
+      const activeTimer: ActiveTimer = {
+        timesheetId: legacy.currentTimesheetId,
+        projectId: legacy.projectId,
+        activityId: legacy.activityId,
+        customerId: legacy.customerId,
+        description: legacy.description || '',
+        startTime: legacy.startTime || new Date().toISOString(),
+        actualStartTime: legacy.actualStartTime || null,
+        jiraIssue: legacy.jiraIssue || null,
+      };
+      store.set('activeTimers', [activeTimer]);
+    }
+
+    const selections: TimerSelections = {
+      customerId: legacy.customerId,
+      projectId: legacy.projectId,
+      activityId: legacy.activityId,
+      description: legacy.isRunning ? '' : (legacy.description || ''),
+      jiraIssue: legacy.isRunning ? null : (legacy.jiraIssue || null),
+    };
+    store.set('timerSelections', selections);
+
+    store.delete('timerState');
+    console.log('Migrated legacy timerState to multi-timer schema');
+  } catch (error) {
+    console.error('Failed to migrate timer state:', error);
+  }
+}
+
+migrateTimerState();
 
 // Track if we're using plaintext fallback (for development without Keychain)
 let usingPlaintextFallback = false;
@@ -193,41 +233,59 @@ export function saveSettings(settings: AppSettings): void {
   store.set('settings', settingsWithoutTokens);
 }
 
-const DEFAULT_TIMER_STATE: TimerState = {
-  isRunning: false,
-  currentTimesheetId: null,
-  startTime: null,
-  actualStartTime: null,
-  customerId: null,
-  projectId: null,
-  activityId: null,
-  description: '',
-  jiraIssue: null,
-};
+// --- Active Timers ---
 
-export function getTimerState(): TimerState {
+export function getActiveTimers(): ActiveTimer[] {
   try {
-    const stored = store.get('timerState') as Partial<TimerState> | undefined;
-    if (!stored) {
-      return DEFAULT_TIMER_STATE;
-    }
-    // Merge with defaults to ensure all fields are present
-    return { ...DEFAULT_TIMER_STATE, ...stored };
+    return store.get('activeTimers') || [];
   } catch (error) {
-    console.error('Failed to read timer state from store:', error);
-    return DEFAULT_TIMER_STATE;
+    console.error('Failed to read active timers from store:', error);
+    return [];
   }
 }
 
-export function saveTimerState(state: TimerState): void {
-  store.set('timerState', state);
+export function addActiveTimer(timer: ActiveTimer): void {
+  const timers = getActiveTimers();
+  timers.push(timer);
+  store.set('activeTimers', timers);
 }
 
-export function updateTimerState(updates: Partial<TimerState>): TimerState {
-  const current = getTimerState();
+export function removeActiveTimer(timesheetId: number): void {
+  const timers = getActiveTimers().filter(t => t.timesheetId !== timesheetId);
+  store.set('activeTimers', timers);
+}
+
+export function updateActiveTimer(timesheetId: number, updates: Partial<ActiveTimer>): void {
+  const timers = getActiveTimers().map(t =>
+    t.timesheetId === timesheetId ? { ...t, ...updates } : t
+  );
+  store.set('activeTimers', timers);
+}
+
+export function setActiveTimers(timers: ActiveTimer[]): void {
+  store.set('activeTimers', timers);
+}
+
+// --- Timer Selections ---
+
+export function getTimerSelections(): TimerSelections {
+  try {
+    return store.get('timerSelections') || { ...DEFAULT_TIMER_SELECTIONS };
+  } catch (error) {
+    console.error('Failed to read timer selections from store:', error);
+    return { ...DEFAULT_TIMER_SELECTIONS };
+  }
+}
+
+export function updateTimerSelections(updates: Partial<TimerSelections>): TimerSelections {
+  const current = getTimerSelections();
   const updated = { ...current, ...updates };
-  saveTimerState(updated);
+  store.set('timerSelections', updated);
   return updated;
+}
+
+export function resetTimerSelections(): void {
+  store.set('timerSelections', { ...DEFAULT_TIMER_SELECTIONS });
 }
 
 /**
