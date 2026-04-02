@@ -8,13 +8,19 @@ import { jiraAPI } from './services/jira';
 import {
   getSettings,
   saveSettings,
-  getTimerState,
-  updateTimerState,
+  getActiveTimers,
+  addActiveTimer,
+  removeActiveTimer,
+  updateActiveTimer,
+  setActiveTimers,
+  getTimerSelections,
+  updateTimerSelections,
+  resetTimerSelections,
   didDecryptionFail,
   clearDecryptionFailedFlag,
   isUsingPlaintextFallback,
 } from './services/store';
-import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ThemeMode, JiraIssue } from './types';
+import { IPC_CHANNELS, VIEW_HASHES, KimaiProject, KimaiActivity, ActiveTimer, TimerSelections, ThemeMode, JiraIssue } from './types';
 import {
   validateAppSettings,
   validateOptionalPositiveInt,
@@ -125,26 +131,24 @@ function createTrayIcon(): Electron.NativeImage {
   return nativeImage.createFromBuffer(buffer, { width: size, height: size });
 }
 
-function getElapsedSeconds(): number {
-  const timerState = getTimerState();
-  if (!timerState.isRunning || !timerState.startTime) {
-    return 0;
-  }
-  const start = new Date(timerState.startTime);
+function getElapsedSeconds(timer: ActiveTimer): number {
+  const start = new Date(timer.startTime);
   const now = new Date();
   return Math.floor((now.getTime() - start.getTime()) / 1000);
 }
 
 async function buildContextMenu(): Promise<Menu> {
-  const timerState = getTimerState();
+  const activeTimers = getActiveTimers();
+  const selections = getTimerSelections();
+  const isRunning = activeTimers.length > 0;
   const settings = getSettings();
 
   // Fetch projects and activities if we have a valid connection
   if (settings.kimai.apiUrl && settings.kimai.apiToken) {
     try {
       cachedProjects = await kimaiAPI.getProjects();
-      if (timerState.projectId) {
-        cachedActivities = await kimaiAPI.getActivities(timerState.projectId);
+      if (selections.projectId) {
+        cachedActivities = await kimaiAPI.getActivities(selections.projectId);
       }
     } catch (error) {
       console.error('Failed to fetch Kimai data:', error);
@@ -154,9 +158,9 @@ async function buildContextMenu(): Promise<Menu> {
   const projectSubmenu: Electron.MenuItemConstructorOptions[] = cachedProjects.map((project) => ({
     label: project.name,
     type: 'radio' as const,
-    checked: timerState.projectId === project.id,
+    checked: selections.projectId === project.id,
     click: async () => {
-      updateTimerState({ projectId: project.id, activityId: null });
+      updateTimerSelections({ projectId: project.id, activityId: null });
       cachedActivities = await kimaiAPI.getActivities(project.id);
       updateTrayMenu();
     },
@@ -165,32 +169,32 @@ async function buildContextMenu(): Promise<Menu> {
   const activitySubmenu: Electron.MenuItemConstructorOptions[] = cachedActivities.map((activity) => ({
     label: activity.name,
     type: 'radio' as const,
-    checked: timerState.activityId === activity.id,
+    checked: selections.activityId === activity.id,
     click: () => {
-      updateTimerState({ activityId: activity.id });
+      updateTimerSelections({ activityId: activity.id });
       updateTrayMenu();
     },
   }));
 
-  const elapsedTime = formatDurationCompact(getElapsedSeconds());
+  const elapsedTime = isRunning ? formatDurationCompact(getElapsedSeconds(activeTimers[0])) : '';
 
   const menuTemplate: Electron.MenuItemConstructorOptions[] = [
     // Timer Status
     {
-      label: timerState.isRunning ? `Running: ${elapsedTime}` : 'Timer Stopped',
+      label: isRunning ? `Running: ${activeTimers.length} timer${activeTimers.length !== 1 ? 's' : ''}` : 'Timer Stopped',
       enabled: false,
     },
     { type: 'separator' },
 
     // Start/Stop Timer
-    timerState.isRunning
+    isRunning
       ? {
-          label: 'Stop Timer',
-          click: stopTimer,
+          label: 'Stop All Timers',
+          click: stopAllTimers,
         }
       : {
           label: 'Start Timer',
-          enabled: !!(timerState.projectId && timerState.activityId),
+          enabled: !!(selections.projectId && selections.activityId),
           click: startTimer,
         },
     { type: 'separator' },
@@ -204,7 +208,7 @@ async function buildContextMenu(): Promise<Menu> {
     // Activity Selection
     {
       label: 'Select Activity',
-      enabled: !!timerState.projectId,
+      enabled: !!selections.projectId,
       submenu: activitySubmenu.length > 0 ? activitySubmenu : [{ label: 'No activities available', enabled: false }],
     },
     { type: 'separator' },
@@ -244,11 +248,15 @@ async function updateTrayMenu(): Promise<void> {
     const menu = await buildContextMenu();
     tray.setContextMenu(menu);
 
-    // Update tooltip with current status
-    const timerState = getTimerState();
-    if (timerState.isRunning) {
-      const elapsed = formatDurationCompact(getElapsedSeconds());
-      tray.setToolTip(`Kimai Time Tracker - Running: ${elapsed}`);
+    const activeTimers = getActiveTimers();
+    if (activeTimers.length > 0) {
+      const count = activeTimers.length;
+      const firstElapsed = formatDurationCompact(getElapsedSeconds(activeTimers[0]));
+      tray.setToolTip(
+        count === 1
+          ? `Kimai Time Tracker - Running: ${firstElapsed}`
+          : `Kimai Time Tracker - ${count} timers running`
+      );
     } else {
       tray.setToolTip('Kimai Time Tracker - Idle');
     }
@@ -256,29 +264,34 @@ async function updateTrayMenu(): Promise<void> {
 }
 
 async function startTimer(): Promise<void> {
-  const timerState = getTimerState();
-  if (!timerState.projectId || !timerState.activityId) {
+  const selections = getTimerSelections();
+  if (!selections.projectId || !selections.activityId) {
     showNotification('Cannot Start Timer', 'Please select a project and activity first.');
     return;
   }
 
-  // Capture actual start time before API call (Kimai will round it)
   const actualStartTime = new Date().toISOString();
 
   try {
     const timesheet = await kimaiAPI.startTimer(
-      timerState.projectId,
-      timerState.activityId,
-      timerState.description
+      selections.projectId,
+      selections.activityId,
+      selections.description
     );
 
-    updateTimerState({
-      isRunning: true,
-      currentTimesheetId: timesheet.id,
+    const activeTimer: ActiveTimer = {
+      timesheetId: timesheet.id,
+      projectId: selections.projectId,
+      activityId: selections.activityId,
+      customerId: selections.customerId,
+      description: selections.description,
       startTime: timesheet.begin,
       actualStartTime: actualStartTime,
-    });
+      jiraIssue: selections.jiraIssue,
+    };
 
+    addActiveTimer(activeTimer);
+    resetTimerSelections();
     startTimerUpdateLoop();
     updateTrayMenu();
   } catch (error) {
@@ -287,28 +300,34 @@ async function startTimer(): Promise<void> {
   }
 }
 
-async function stopTimer(): Promise<void> {
-  const timerState = getTimerState();
-  if (!timerState.currentTimesheetId) {
-    return;
-  }
-
+async function stopTimer(timesheetId: number): Promise<void> {
   try {
-    await kimaiAPI.stopTimer(timerState.currentTimesheetId);
+    await kimaiAPI.stopTimer(timesheetId);
+    removeActiveTimer(timesheetId);
 
-    updateTimerState({
-      isRunning: false,
-      currentTimesheetId: null,
-      startTime: null,
-      actualStartTime: null,
-    });
-
-    stopTimerUpdateLoop();
+    const remaining = getActiveTimers();
+    if (remaining.length === 0) {
+      stopTimerUpdateLoop();
+    }
     updateTrayMenu();
   } catch (error) {
     console.error('Failed to stop timer:', error);
     showNotification('Error', 'Failed to stop timer. Please check your connection.');
   }
+}
+
+async function stopAllTimers(): Promise<void> {
+  const timers = getActiveTimers();
+  for (const timer of timers) {
+    try {
+      await kimaiAPI.stopTimer(timer.timesheetId);
+      removeActiveTimer(timer.timesheetId);
+    } catch (error) {
+      console.error(`Failed to stop timer ${timer.timesheetId}:`, error);
+    }
+  }
+  stopTimerUpdateLoop();
+  updateTrayMenu();
 }
 
 function startTimerUpdateLoop(): void {
@@ -350,8 +369,8 @@ function checkAndRemind(): void {
   }
 
   // Check if Kimai timer is running
-  const timerState = getTimerState();
-  if (!timerState.isRunning) {
+  const activeTimers = getActiveTimers();
+  if (activeTimers.length === 0) {
     showNotification('Time Tracking', 'Don\'t forget to start your timer');
   }
 }
@@ -536,13 +555,14 @@ function setupIPC(): void {
     const validProjectId = validateStrictPositiveInt(projectId, 'projectId');
     const validActivityId = validateStrictPositiveInt(activityId, 'activityId');
     const validDescription = validateOptionalString(description, 'description') || '';
-    updateTimerState({ projectId: validProjectId, activityId: validActivityId, description: validDescription });
+    updateTimerSelections({ projectId: validProjectId, activityId: validActivityId, description: validDescription });
     await startTimer();
-    return getTimerState();
+    return { activeTimers: getActiveTimers(), selections: getTimerSelections() };
   });
-  ipcMain.handle(IPC_CHANNELS.KIMAI_STOP_TIMER, async () => {
-    await stopTimer();
-    return getTimerState();
+  ipcMain.handle(IPC_CHANNELS.KIMAI_STOP_TIMER, async (_, timesheetId: unknown) => {
+    const validId = validateStrictPositiveInt(timesheetId, 'timesheetId');
+    await stopTimer(validId);
+    return { activeTimers: getActiveTimers(), selections: getTimerSelections() };
   });
   ipcMain.handle(IPC_CHANNELS.KIMAI_CREATE_TIMESHEET, (_, data: unknown) => {
     const validated = validateTimesheetCreate(data);
@@ -555,15 +575,15 @@ function setupIPC(): void {
   ipcMain.handle(IPC_CHANNELS.KIMAI_UPDATE_DESCRIPTION, async (_, id: unknown, description: unknown) => {
     const validId = validateStrictPositiveInt(id, 'id');
     const validDescription = validateOptionalString(description, 'description') || '';
-    // Add tracking prefix if timer is running for this timesheet
-    const timerState = getTimerState();
-    const isTracking = timerState.isRunning && timerState.currentTimesheetId === validId;
+    const activeTimers = getActiveTimers();
+    const isTracking = activeTimers.some(t => t.timesheetId === validId);
     const finalDescription = isTracking
       ? KimaiAPI.addTrackingPrefix(validDescription)
       : validDescription;
     const result = await kimaiAPI.updateTimesheet(validId, { description: finalDescription });
-    // Update local timer state description (without prefix)
-    updateTimerState({ description: validDescription });
+    if (isTracking) {
+      updateActiveTimer(validId, { description: validDescription });
+    }
     return result;
   });
 
@@ -604,13 +624,16 @@ function setupIPC(): void {
     return jiraAPI.transitionToInProgress(validIssueKey);
   });
 
-  // Timer State
-  ipcMain.handle(IPC_CHANNELS.GET_TIMER_STATE, () => getTimerState());
-  ipcMain.handle(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, (_, jiraIssue: JiraIssue | null) => {
-    return updateTimerState({ jiraIssue });
+  // Active Timers
+  ipcMain.handle(IPC_CHANNELS.GET_ACTIVE_TIMERS, () => getActiveTimers());
+
+  // Timer Selections
+  ipcMain.handle(IPC_CHANNELS.GET_TIMER_SELECTIONS, () => getTimerSelections());
+  ipcMain.handle(IPC_CHANNELS.SET_TIMER_SELECTIONS, (_, selections: Partial<TimerSelections>) => {
+    return updateTimerSelections(selections);
   });
-  ipcMain.handle(IPC_CHANNELS.SET_TIMER_SELECTIONS, (_, selections: { customerId?: number | null; projectId?: number | null; activityId?: number | null }) => {
-    return updateTimerState(selections);
+  ipcMain.handle(IPC_CHANNELS.SET_TIMER_JIRA_ISSUE, (_, jiraIssue: JiraIssue | null) => {
+    return updateTimerSelections({ jiraIssue });
   });
 
   // Work Session
@@ -928,25 +951,41 @@ async function initializeApp(): Promise<void> {
     tray.popUpContextMenu(contextMenu);
   });
 
-  // Check if timer was running (recover state)
-  const timerState = getTimerState();
-  if (timerState.isRunning && timerState.currentTimesheetId) {
-    // Verify the timer is still running on the server
-    try {
-      const active = await kimaiAPI.getActiveTimesheets();
-      const isStillRunning = active.some((t) => t.id === timerState.currentTimesheetId);
-      if (isStillRunning) {
-        startTimerUpdateLoop();
-      } else {
-        // Timer was stopped elsewhere, update local state
-        updateTimerState({
-          isRunning: false,
-          currentTimesheetId: null,
-          startTime: null,
-        });
+  // Recover active timers — sync with Kimai server
+  try {
+    const serverActive = await kimaiAPI.getActiveTimesheets();
+    const localTimers = getActiveTimers();
+
+    const merged: ActiveTimer[] = serverActive.map(serverTs => {
+      const local = localTimers.find(lt => lt.timesheetId === serverTs.id);
+      if (local) {
+        return {
+          ...local,
+          startTime: serverTs.begin,
+          projectId: serverTs.project,
+          activityId: serverTs.activity,
+          description: KimaiAPI.stripTrackingPrefix(serverTs.description || ''),
+        };
       }
-    } catch {
-      // Unable to verify, assume still running
+      return {
+        timesheetId: serverTs.id,
+        projectId: serverTs.project,
+        activityId: serverTs.activity,
+        customerId: null,
+        description: KimaiAPI.stripTrackingPrefix(serverTs.description || ''),
+        startTime: serverTs.begin,
+        actualStartTime: null,
+        jiraIssue: null,
+      };
+    });
+
+    setActiveTimers(merged);
+
+    if (merged.length > 0) {
+      startTimerUpdateLoop();
+    }
+  } catch {
+    if (getActiveTimers().length > 0) {
       startTimerUpdateLoop();
     }
   }
