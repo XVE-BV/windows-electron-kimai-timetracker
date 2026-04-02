@@ -153,6 +153,9 @@ export interface JiraSearchResult {
 // Theme mode
 export type ThemeMode = 'system' | 'light' | 'dark';
 
+// Tray icon state
+export type TrayIconState = 'idle' | 'tracking' | 'idle-muted' | 'tracking-muted';
+
 // App Settings
 export interface AppSettings {
   kimai: KimaiSettings;
@@ -281,6 +284,9 @@ export const IPC_CHANNELS = {
   // Encryption status
   GET_ENCRYPTION_STATUS: 'get-encryption-status',
   DID_CREDENTIALS_NEED_REENTRY: 'did-credentials-need-reentry',
+
+  // Tray Icons
+  SET_TRAY_ICONS: 'set-tray-icons',
 } as const;
 
 // QR Code Payload for Mobile App Setup

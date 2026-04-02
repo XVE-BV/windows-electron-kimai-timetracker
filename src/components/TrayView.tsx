@@ -81,6 +81,17 @@ export function TrayView() {
     return () => unsubscribe?.();
   }, []);
 
+  // Generate and send tray icons to main process on mount
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    const platform = window.electronAPI.getPlatform();
+    import('../services/tray-icon-generator').then(({ generateTrayIcons }) => {
+      generateTrayIcons(platform).then((icons) => {
+        window.electronAPI.setTrayIcons(icons);
+      });
+    });
+  }, []);
+
   // Apply dark mode class to document
   useEffect(() => {
     if (isDark) {
