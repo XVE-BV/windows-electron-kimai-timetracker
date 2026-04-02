@@ -370,6 +370,9 @@ function showNotification(title: string, body: string): void {
   console.log('[notification] Showing:', title, body);
   if (Notification.isSupported()) {
     const notification = new Notification({ title, body });
+    notification.on('click', () => {
+      navigateTrayWindow(VIEW_HASHES.TRAY);
+    });
     notification.show();
     notification.on('show', () => console.log('[notification] Shown successfully'));
     notification.on('failed', (e) => console.error('[notification] Failed:', e));
