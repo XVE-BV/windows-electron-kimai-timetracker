@@ -543,7 +543,7 @@ export function TrayView() {
     setSearchQuery('');
     setView('activities');
     window.electronAPI?.setTimerSelections({
-      customerId: selectedCustomer?.id ?? null,
+      customerId: project.customer,
       projectId: project.id,
       activityId: null,
     });
@@ -553,9 +553,12 @@ export function TrayView() {
     setSelectedActivity(activity);
     setSearchQuery('');
     setView('main');
+    const activityProject = activity.project != null
+      ? allProjects.find(p => p.id === activity.project) ?? null
+      : null;
     window.electronAPI?.setTimerSelections({
-      customerId: selectedCustomer?.id ?? null,
-      projectId: selectedProject?.id ?? null,
+      customerId: activityProject?.customer ?? null,
+      projectId: activity.project ?? null,
       activityId: activity.id,
     });
   };
