@@ -287,31 +287,14 @@ function updateTrayIcon(): void {
   const isMac = process.platform === 'darwin';
   const activeTimers = getActiveTimers();
 
-  // macOS: show elapsed time next to tray icon
+  // macOS: clear any title text (status shown via icon color change)
   if (isMac) {
-    if (activeTimers.length > 0) {
-      const elapsed = formatDurationCompact(getElapsedSeconds(activeTimers[0]));
-      tray.setTitle(elapsed, { fontType: 'monospacedDigit' });
-    } else {
-      tray.setTitle('');
-    }
+    tray.setTitle('');
   }
 
   // macOS: dock badge with active timer count
   if (isMac && app.dock) {
     app.dock.setBadge(activeTimers.length > 0 ? activeTimers.length.toString() : '');
-  }
-
-  // Windows: overlay icon on taskbar
-  if (process.platform === 'win32' && trayWindow && !trayWindow.isDestroyed()) {
-    if (activeTimers.length > 0) {
-      const overlay = trayIconCache['tracking'];
-      if (overlay) {
-        trayWindow.setOverlayIcon(overlay.resize({ width: 16, height: 16 }), 'Timer running');
-      }
-    } else {
-      trayWindow.setOverlayIcon(null, '');
-    }
   }
 }
 
@@ -929,7 +912,10 @@ function setupIPC(): void {
           height: 32,
           scaleFactor: 2.0,
         });
-        img.setTemplateImage(true);
+        // Only idle icons use template mode (OS controls color).
+        // Tracking icons use a colored red dot — not a template.
+        const isIdle = state === 'idle' || state === 'idle-muted';
+        img.setTemplateImage(isIdle);
       }
       trayIconCache[state as TrayIconState] = img;
     }

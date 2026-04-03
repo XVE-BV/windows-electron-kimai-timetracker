@@ -17,25 +17,36 @@ const CLOCK_SVG = `
   <path d="M12 6v6l4 2"/>
 `;
 
-// Timer: top bar + circle + hands
-const TIMER_SVG = `
-  <line x1="10" x2="14" y1="2" y2="2"/>
-  <line x1="12" x2="15" y1="14" y2="11"/>
-  <circle cx="12" cy="14" r="8"/>
-`;
-
 // Diagonal slash overlay for "muted" state
 const MUTE_SLASH_SVG = `
   <line x1="3" x2="21" y1="3" y2="21" stroke-width="2.5"/>
 `;
 
-type IconDef = { base: string; overlay?: string };
+// Solid red dot for active tracking (like Teams status indicator)
+const TRACKING_DOT_COLOR = '#E53935';
+
+type IconDef =
+  | { type: 'stroke'; base: string; overlay?: string }
+  | { type: 'custom'; svg: (size: number) => string };
 
 const ICON_DEFS: Record<TrayIconState, IconDef> = {
-  'idle':            { base: CLOCK_SVG },
-  'tracking':        { base: TIMER_SVG },
-  'idle-muted':      { base: CLOCK_SVG, overlay: MUTE_SLASH_SVG },
-  'tracking-muted':  { base: TIMER_SVG, overlay: MUTE_SLASH_SVG },
+  'idle':            { type: 'stroke', base: CLOCK_SVG },
+  'idle-muted':      { type: 'stroke', base: CLOCK_SVG, overlay: MUTE_SLASH_SVG },
+  'tracking':        {
+    type: 'custom',
+    svg: (size) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">` +
+      `<circle cx="12" cy="12" r="8" fill="${TRACKING_DOT_COLOR}"/>` +
+      `</svg>`,
+  },
+  'tracking-muted':  {
+    type: 'custom',
+    svg: (size) =>
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">` +
+      `<circle cx="12" cy="12" r="8" fill="${TRACKING_DOT_COLOR}"/>` +
+      `<line x1="4" x2="20" y1="4" y2="20" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round"/>` +
+      `</svg>`,
+  },
 };
 
 function buildSvgString(paths: string, color: string, size: number): string {
@@ -77,8 +88,13 @@ export async function generateTrayIcons(
   const entries = await Promise.all(
     (Object.entries(ICON_DEFS) as [TrayIconState, IconDef][]).map(
       async ([state, def]) => {
-        const paths = def.overlay ? def.base + def.overlay : def.base;
-        const svg = buildSvgString(paths, color, size);
+        let svg: string;
+        if (def.type === 'custom') {
+          svg = def.svg(size);
+        } else {
+          const paths = def.overlay ? def.base + def.overlay : def.base;
+          svg = buildSvgString(paths, color, size);
+        }
         const dataUrl = await renderSvgToDataUrl(svg, size);
         return [state, dataUrl] as [TrayIconState, string];
       },
