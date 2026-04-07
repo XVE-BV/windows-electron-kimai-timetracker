@@ -58,6 +58,11 @@ export function TrayView() {
   const [recentEntriesOpen, setRecentEntriesOpen] = useState(false);
   const [activityPanelOpen, setActivityPanelOpen] = useState(false);
 
+  // Inline description editing
+  const [editingTimerId, setEditingTimerId] = useState<number | null>(null);
+  const [editDescription, setEditDescription] = useState('');
+  const [editOriginalDescription, setEditOriginalDescription] = useState('');
+
   // Theme state (using Electron's nativeTheme)
   const [themeMode, setThemeMode] = useState<ThemeMode>('system');
   const [isDark, setIsDark] = useState(false);
@@ -476,6 +481,25 @@ export function TrayView() {
     } catch (error) {
       console.error('Failed to delete timesheet:', error);
       showError('Failed to delete time entry');
+    }
+  };
+
+  const handleSaveDescription = async (timesheetId: number, newDescription: string, originalDescription: string) => {
+    if (!window.electronAPI) return;
+    if (newDescription === originalDescription) {
+      setEditingTimerId(null);
+      return;
+    }
+    try {
+      await window.electronAPI.kimaiUpdateDescription(timesheetId, newDescription);
+      setActiveTimers(prev => prev.map(t =>
+        t.timesheetId === timesheetId ? { ...t, description: newDescription } : t
+      ));
+    } catch (error) {
+      console.error('Failed to update description:', error);
+      showError('Failed to update description');
+    } finally {
+      setEditingTimerId(null);
     }
   };
 
@@ -1181,11 +1205,38 @@ export function TrayView() {
                       {activityNameCache[timer.activityId] || `Activity #${timer.activityId}`}
                     </span>
                   </div>
-                  {timer.description && (
-                    <div className="text-xs text-muted-foreground mt-1 ml-4 truncate">
-                      {timer.description}
-                    </div>
-                  )}
+                  <div className="mt-1 ml-4">
+                    {editingTimerId === timer.timesheetId ? (
+                      <textarea
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            (e.target as HTMLTextAreaElement).blur();
+                          } else if (e.key === 'Escape') {
+                            setEditingTimerId(null);
+                          }
+                        }}
+                        onBlur={() => handleSaveDescription(timer.timesheetId, editDescription, editOriginalDescription)}
+                        autoFocus
+                        rows={2}
+                        className="w-full px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary resize-none"
+                        placeholder="What are you working on?"
+                      />
+                    ) : (
+                      <button
+                        onClick={() => {
+                          setEditingTimerId(timer.timesheetId);
+                          setEditDescription(timer.description);
+                          setEditOriginalDescription(timer.description);
+                        }}
+                        className="text-xs text-muted-foreground truncate block w-full text-left hover:text-foreground transition-colors"
+                      >
+                        {timer.description || 'Add description...'}
+                      </button>
+                    )}
+                  </div>
                   {timer.jiraIssue && (
                     <div className="mt-1 ml-4">
                       <span className="text-[10px] font-mono px-1.5 py-0.5 bg-blue-500/10 text-blue-600 rounded">
