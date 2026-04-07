@@ -61,6 +61,7 @@ export function TrayView() {
   // Inline description editing
   const [editingTimerId, setEditingTimerId] = useState<number | null>(null);
   const [editDescription, setEditDescription] = useState('');
+  const [editOriginalDescription, setEditOriginalDescription] = useState('');
 
   // Theme state (using Electron's nativeTheme)
   const [themeMode, setThemeMode] = useState<ThemeMode>('system');
@@ -1212,12 +1213,12 @@ export function TrayView() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' && !e.shiftKey) {
                             e.preventDefault();
-                            handleSaveDescription(timer.timesheetId, editDescription, timer.description);
+                            (e.target as HTMLTextAreaElement).blur();
                           } else if (e.key === 'Escape') {
                             setEditingTimerId(null);
                           }
                         }}
-                        onBlur={() => handleSaveDescription(timer.timesheetId, editDescription, timer.description)}
+                        onBlur={() => handleSaveDescription(timer.timesheetId, editDescription, editOriginalDescription)}
                         autoFocus
                         rows={2}
                         className="w-full px-2 py-1 text-xs bg-background border border-border rounded focus:outline-none focus:ring-1 focus:ring-primary/50 focus:border-primary resize-none"
@@ -1228,6 +1229,7 @@ export function TrayView() {
                         onClick={() => {
                           setEditingTimerId(timer.timesheetId);
                           setEditDescription(timer.description);
+                          setEditOriginalDescription(timer.description);
                         }}
                         className="text-xs text-muted-foreground truncate block w-full text-left hover:text-foreground transition-colors"
                       >
