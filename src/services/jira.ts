@@ -187,8 +187,15 @@ class JiraAPI {
 
   async transitionToInProgress(issueKey: string): Promise<{ success: boolean; message: string }> {
     try {
+      const issue = await this.request<JiraIssue>('GET', `/issue/${issueKey}?fields=status`);
+      const statusCategory = issue.fields.status.statusCategory.key;
+
+      // Only transition from "To Do" category. Anything else (In Progress, In Review, Done) is left untouched.
+      if (statusCategory !== 'new') {
+        return { success: true, message: `No transition needed (${issue.fields.status.name})` };
+      }
+
       const transitions = await this.getTransitions(issueKey);
-      // Find a transition that leads to "In Progress"
       const inProgressTransition = transitions.find(t =>
         t.to.name.toLowerCase() === 'in progress'
       );
