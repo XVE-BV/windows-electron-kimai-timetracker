@@ -407,8 +407,9 @@ export function TrayView() {
     try {
       await window.electronAPI.kimaiStartTimer(selectedProject.id, selectedActivity.id, description);
 
-      // Transition Jira issue to "In Progress" if applicable (from "To Do" or "In Review" status)
-      if (selectedJiraIssue) {
+      // Transition Jira issue to "In Progress" only if currently in "To Do" category.
+      // Issues in "In Progress" / "In Review" stay as-is.
+      if (selectedJiraIssue && selectedJiraIssue.fields.status.statusCategory.key === 'new') {
         try {
           const result = await window.electronAPI.jiraTransitionToInProgress(selectedJiraIssue.key);
           if (!result.success) {

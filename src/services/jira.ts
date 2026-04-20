@@ -190,9 +190,9 @@ class JiraAPI {
       const issue = await this.request<JiraIssue>('GET', `/issue/${issueKey}?fields=status`);
       const statusCategory = issue.fields.status.statusCategory.key;
 
-      // Only transition if in "To Do" status. Issues in "In Progress" or "In Review" are already progressing
-      if (statusCategory !== 'to_do') {
-        return { success: true, message: `Already in progress (${issue.fields.status.name})` };
+      // Only transition from "To Do" category. Anything else (In Progress, In Review, Done) is left untouched.
+      if (statusCategory !== 'new') {
+        return { success: true, message: `No transition needed (${issue.fields.status.name})` };
       }
 
       const transitions = await this.getTransitions(issueKey);
